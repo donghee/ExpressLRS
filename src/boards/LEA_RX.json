@@ -1,0 +1,40 @@
+{
+  "build": {
+    "core": "stm32",
+    "cpu": "cortex-m4",
+    "extra_flags": "-DSTM32F4xx -DSTM32F405xx",
+    "f_cpu": "168000000L",
+	"ldscript": "ldscript.ld",
+    "mcu": "stm32f405rgt6",
+    "product_line": "STM32F405xx",
+    "variants_dir": "variants",
+    "variant": "LEA_RX"
+  },
+  "connectivity": [
+    "can"
+  ],
+  "debug": {
+    "jlink_device": "STM32F405RG",
+    "openocd_target": "stm32f4x",
+    "svd_path": "STM32F40x.svd"
+  },
+  "frameworks": [
+    "arduino",
+    "cmsis",
+    "stm32cube",
+    "libopencm3"
+  ],
+  "name": "LEA RX",
+  "upload": {
+    "maximum_ram_size": 131072,
+    "maximum_size": 245760,
+    "protocol": "stlink",
+    "protocols": [
+      "jlink",
+      "stlink",
+      "blackmagic"
+    ]
+  },
+  "url": "https://www.etri.re.kr",
+  "vendor": "ETRI"
+}
