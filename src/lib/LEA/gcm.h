@@ -1,8 +1,8 @@
 #pragma once
 
+#include "OTA.h"
 #include "device.h"
 #include <cstdint>
-#include "OTA.h"
 
 extern "C"
 {
@@ -16,7 +16,7 @@ extern "C"
 #define LEA_MAX_PAYLOAD_SIZE (OTA8_LEA_PACKET_SIZE * 2)
 
 /*  LEA GCM encryption and decryption
-*/
+ */
 
 class GCM
 {
@@ -37,9 +37,9 @@ private:
 public:
     GCM();
     int init();
-    int encrypt(OTA_Packet_s * otaPktPtr, uint8_t *data, uint8_t dataLen); // otaPktPtr -> data
-    int decrypt(OTA_Packet_s * otaPktPtr, const uint8_t *data, uint8_t dataLen); // data --> otaPktPtr
+    void setKey(uint8_t *key);
+    void setNonce(uint8_t *nonce);
+    int encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen);       // otaPktPtr -> data
+    int decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen); // data --> otaPktPtr
     void reset();
 };
-
-extern GCM gcm;

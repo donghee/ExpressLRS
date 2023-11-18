@@ -25,6 +25,16 @@ int GCM::init()
     return is_ok;
 }
 
+void GCM::setKey(uint8_t *key)
+{
+    memcpy(K, key, 16);
+}
+
+void GCM::setNonce(uint8_t *nonce)
+{
+    memcpy(N, nonce, 16);
+}
+
 int GCM::encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen) // ota to data
 {
     int is_ok = -1;
