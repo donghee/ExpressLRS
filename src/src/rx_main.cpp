@@ -15,6 +15,7 @@
 #include "dynpower.h"
 #include "MeanAccumulator.h"
 #include "freqTable.h"
+#include "gcm.h"
 
 #include "rx-serial/SerialIO.h"
 #include "rx-serial/SerialNOOP.h"
@@ -998,7 +999,22 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
     }
     uint32_t const beginProcessing = micros();
 
+#if defined(USE_LEA)
+    GCM lea_gcm;
+    lea_gcm.init();
+
+    uint8_t payload[OTA8_LEA_PACKET_SIZE*2];
+
+    if (lea_gcm.decrypt((OTA_Packet_s *)Radio.RXdataBuffer, payload, 32) != 0)
+    {
+        DBGLN("LEA GCM encrypt error");
+        return false;
+    }
+
+    OTA_Packet_s * const otaPktPtr = (OTA_Packet_s * const)payload;
+#else
     OTA_Packet_s * const otaPktPtr = (OTA_Packet_s * const)Radio.RXdataBuffer;
+#endif
     if (!OtaValidatePacketCrc(otaPktPtr))
     {
         DBGVLN("CRC error");
