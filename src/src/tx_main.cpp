@@ -20,6 +20,7 @@
 #include "devThermal.h"
 #include "devPDET.h"
 #include "devBackpack.h"
+#include "gcm.h"
 
 //// CONSTANTS ////
 #define MSP_PACKET_SEND_INTERVAL 10LU
@@ -571,7 +572,31 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
   }
 #endif
 
+#if defined(USE_LEA)
+  GCM_st gcm_TX;
+
+  uint8_t K[16] = {0x14, 0x87, 0x0B, 0x99, 0x92, 0xEA, 0x89, 0x67, 0x8A, 0x1D, 0xDF, 0xD6, 0x30, 0x91, 0x8D, 0xF0};
+  uint8_t A[16] = {0,};
+  uint8_t N[12] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B};
+
+  uint8_t payload[OTA8_LEA_PACKET_SIZE*2];
+
+  GCM4LEA_set_init_params(&gcm_TX, K, 128, A, 0, 128);
+
+	// TX
+  GCM4LEA_set_enc_params(&gcm_TX, (uint8_t*)&otaPkt, OTA8_LEA_PACKET_SIZE, N, 12);
+  GCM4LEA_enc(&gcm_TX);
+
+	memcpy(payload, gcm_TX.T, OTA8_LEA_PACKET_SIZE);
+	memcpy(payload+OTA8_LEA_PACKET_SIZE, gcm_TX.CC, OTA8_LEA_PACKET_SIZE);
+
+  int payloadLength = OTA8_LEA_PACKET_SIZE*2;
+  //int payloadLength = ExpressLRS_currAirRate_Modparams->PayloadLength,
+
+  Radio.TXnb(payload, payloadLength, transmittingRadio);
+#else
   Radio.TXnb((uint8_t*)&otaPkt, ExpressLRS_currAirRate_Modparams->PayloadLength, transmittingRadio);
+#endif
 }
 
 void ICACHE_RAM_ATTR nonceAdvance()
