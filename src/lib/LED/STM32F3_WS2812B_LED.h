@@ -20,7 +20,7 @@ static inline void LEDsend_1(void) {
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
-#if defined(STM32F1)
+#if defined(STM32F1) || defined(STM32F4)
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
@@ -32,13 +32,13 @@ static inline void LEDsend_1(void) {
         __NOP();
 #endif
         __NOP(); __NOP(); __NOP(); __NOP();
-#if !defined(STM32F1)
+#if !defined(STM32F1) || !defined(STM32F4)
         __NOP();
 #endif
         digitalWriteFast(GPIO_PIN_LED_WS2812_FAST, LOW);
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
-#if defined(STM32F1)
+#if defined(STM32F1) || defined(STM32F4)
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
@@ -46,7 +46,7 @@ static inline void LEDsend_1(void) {
         __NOP(); __NOP(); __NOP();
 #endif
         __NOP(); __NOP(); __NOP(); __NOP();
-#if !defined(STM32F1)
+#if !defined(STM32F1) || !defined(STM32F4)
         __NOP(); __NOP(); __NOP(); __NOP();
 #endif
 }
@@ -55,7 +55,7 @@ static inline void LEDsend_0(void) {
         digitalWriteFast(GPIO_PIN_LED_WS2812_FAST, HIGH);
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
-#if defined(STM32F1)
+#if defined(STM32F1) || defined(STM32F4)
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
@@ -63,7 +63,7 @@ static inline void LEDsend_0(void) {
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
 #endif
         __NOP(); __NOP(); __NOP(); __NOP();
-#if !defined(STM32F1)
+#if !defined(STM32F1) || !defined(STM32F4)
         __NOP(); __NOP(); __NOP(); __NOP();
 #endif
         digitalWriteFast(GPIO_PIN_LED_WS2812_FAST, LOW);
@@ -75,7 +75,7 @@ static inline void LEDsend_0(void) {
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
-#if defined(STM32F1)
+#if defined(STM32F1) || defined(STM32F4)
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
         __NOP(); __NOP(); __NOP(); __NOP(); __NOP();
@@ -87,7 +87,7 @@ static inline void LEDsend_0(void) {
         __NOP(); __NOP(); __NOP(); __NOP();
 #endif
         __NOP(); __NOP(); __NOP(); __NOP();
-#if !defined(STM32F1)
+#if !defined(STM32F1) || !defined(STM32F4)
         __NOP();
 #endif
 }
