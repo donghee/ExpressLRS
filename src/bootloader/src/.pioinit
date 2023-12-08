@@ -1,0 +1,6 @@
+file .pio/build/LEA/firmware.elf
+target remote localhost:2331
+monitor reset
+#monitor flash erase
+load
+#break main

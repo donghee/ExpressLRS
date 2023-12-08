@@ -258,7 +258,7 @@ static int8_t boot_code_xmodem(int32_t rx_pin, int32_t tx_pin)
    * otherwise stay in the bootloader. */
   uart_transmit_str("Send 'bbbb' or hold down button\n\r");
 
-#if 0 // UART ECHO DEBUG
+#if 1 // UART ECHO DEBUG
   uint8_t _led_tmp = 0;
   while(1) {
     if (uart_receive_timeout(header, 1u, 1000) == UART_OK) {

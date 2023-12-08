@@ -20,6 +20,11 @@
 #include "stm32f1xx_hal.h"
 #elif defined(STM32F3xx)
 #include "stm32f3xx_hal.h"
+#elif defined(STM32F4xx)
+#include "stm32f4xx_hal.h"
+#define FLASH_PAGE_SIZE      (0x800U)
+#define FLASH_TYPEERASE_PAGES     (0x00U)
+#include "Legacy/stm32_hal_legacy.h"
 #endif
 #include <stdint.h>
 

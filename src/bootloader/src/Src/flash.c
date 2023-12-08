@@ -79,6 +79,13 @@ flash_status flash_erase(uint32_t address)
   FLASH_EraseInitTypeDef erase_init;
   uint32_t error = 0u;
 
+#if defined(STM32F4xx)
+  erase_init.TypeErase = FLASH_TYPEERASE_SECTORS;
+  erase_init.VoltageRange = FLASH_VOLTAGE_RANGE_3;
+  erase_init.Sector = FLASH_SECTOR_0; //Specify sector number
+  erase_init.NbSectors = 1; //This is also important!
+#else
+
   erase_init.TypeErase = FLASH_TYPEERASE_PAGES;
 #if defined(STM32L4xx)
   erase_init.Page = (address - FLASH_BASE) / FLASH_PAGE_SIZE;
@@ -90,6 +97,8 @@ flash_status flash_erase(uint32_t address)
 #endif
   /* Calculate the number of pages from "address" and the end of flash. */
   erase_init.NbPages = (FLASH_APP_END_ADDRESS - address + 1) / FLASH_PAGE_SIZE;
+
+#endif
   /* Do the actual erasing. */
   HAL_FLASH_Unlock();
   if (HAL_OK == HAL_FLASHEx_Erase(&erase_init, &error))
@@ -113,6 +122,14 @@ flash_status flash_erase_page(uint32_t address)
   uint32_t error = 0u;
 
   erase_init.TypeErase = FLASH_TYPEERASE_PAGES;
+
+#if defined(STM32F4xx)
+  erase_init.TypeErase = FLASH_TYPEERASE_SECTORS;
+  erase_init.VoltageRange = FLASH_VOLTAGE_RANGE_3;
+  erase_init.Sector = FLASH_SECTOR_0; //Specify sector number
+  erase_init.NbSectors = 1; //This is also important!
+#else
+
 #if defined(STM32L4xx)
   erase_init.Page = (address - FLASH_BASE) / FLASH_PAGE_SIZE;
 #else
@@ -122,6 +139,8 @@ flash_status flash_erase_page(uint32_t address)
   erase_init.Banks = FLASH_BANK_1;
 #endif
   erase_init.NbPages = 1;
+
+#endif
 
   /* Do the actual erasing. */
   HAL_FLASH_Unlock();

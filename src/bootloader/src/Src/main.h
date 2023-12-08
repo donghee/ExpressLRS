@@ -42,6 +42,11 @@
 #include "stm32f3xx_hal.h"
 #include "stm32f3xx_ll_gpio.h"
 #include "stm32f3xx_ll_usart.h"
+#elif defined(STM32F4xx)
+#include "stm32f4xx_hal.h"
+#include "stm32f4xx_hal.h"
+#include "stm32f4xx_ll_gpio.h"
+#include "stm32f4xx_ll_usart.h"
 #elif defined(STM32L4xx)
 #include "stm32l4xx.h"
 #include "stm32l4xx_hal.h"
