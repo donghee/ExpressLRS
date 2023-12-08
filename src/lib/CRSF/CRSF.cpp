@@ -136,7 +136,7 @@ void CRSF::Begin()
     pinMode(GPIO_PIN_BUFFER_OE, OUTPUT);
     digitalWrite(GPIO_PIN_BUFFER_OE, LOW ^ GPIO_PIN_BUFFER_OE_INVERTED); // RX mode default
     #elif (GPIO_PIN_RCSIGNAL_TX == GPIO_PIN_RCSIGNAL_RX)
-    CRSF::Port.setHalfDuplex();
+    //CRSF::Port.setHalfDuplex();
     #endif
 
     CRSF::Port.begin(UARTrequestedBaud);
