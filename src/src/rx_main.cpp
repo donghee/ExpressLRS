@@ -15,7 +15,6 @@
 #include "dynpower.h"
 #include "MeanAccumulator.h"
 #include "freqTable.h"
-#include "gcm.h"
 
 #include "rx-serial/SerialIO.h"
 #include "rx-serial/SerialNOOP.h"
@@ -36,6 +35,7 @@
 #include "devSerialUpdate.h"
 #include "devBaro.h"
 #include "devMSPVTX.h"
+#include "gcm.h"
 
 #if defined(PLATFORM_ESP8266)
 #include <user_interface.h>
@@ -222,6 +222,8 @@ bool InLoanBindingMode = false;
 bool returnModelFromLoan = false;
 static unsigned long loanBindTimeout = LOAN_BIND_TIMEOUT_DEFAULT;
 static unsigned long loadBindingStartedMs = 0;
+
+GCM lea_gcm;
 
 void reset_into_bootloader(void);
 void EnterBindingMode();
@@ -1000,9 +1002,6 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
     uint32_t const beginProcessing = micros();
 
 #if defined(USE_LEA)
-    GCM lea_gcm;
-    lea_gcm.init();
-
     uint8_t payload[OTA8_LEA_PACKET_SIZE*2];
 
     if (lea_gcm.decrypt((OTA_Packet_s *)Radio.RXdataBuffer, payload, 32) != 0)
@@ -1784,6 +1783,10 @@ void setup()
             Radio.RXnb();
             hwTimer::init(HWtimerCallbackTick, HWtimerCallbackTock);
         }
+
+#if defined(USE_LEA)
+        lea_gcm.init();
+#endif
     }
 
 #if defined(HAS_BUTTON)

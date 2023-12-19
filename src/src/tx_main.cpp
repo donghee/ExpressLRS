@@ -78,6 +78,8 @@ StubbornReceiver TelemetryReceiver;
 StubbornSender MspSender;
 uint8_t CRSFinBuffer[CRSF_MAX_PACKET_LEN+1];
 
+GCM lea_gcm;
+
 device_affinity_t ui_devices[] = {
   {&CRSF_device, 1},
 #ifdef HAS_LED
@@ -573,9 +575,6 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
 #endif
 
 #if defined(USE_LEA)
-  GCM lea_gcm;
-  lea_gcm.init();
-
   uint8_t payload[OTA8_LEA_PACKET_SIZE*2];
   int payloadLength = OTA8_LEA_PACKET_SIZE*2;
   //int payloadLength = ExpressLRS_currAirRate_Modparams->PayloadLength,
@@ -1342,6 +1341,10 @@ void setup()
     config.SetMotionMode(0); // Ensure motion detection is off
     UARTconnected();
   }
+
+#if defined(USE_LEA)
+  lea_gcm.init();
+#endif
 }
 
 void loop()
