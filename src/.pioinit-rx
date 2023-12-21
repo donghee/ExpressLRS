@@ -1,17 +1,20 @@
 # blackmagic probe
 file .pio/build/LEA_2400_RX_via_STLINK/firmware.elf
 target extended-remote /dev/ttyBmpGdb
+monitor reset
 monitor swdp_scan
 attach 1
 set mem inaccessible-by-default off
 load .pio/build/LEA_2400_RX_via_STLINK/firmware.elf
-#break main
-break setupRadio
-#break SX1280Driver::IsrCallback
-break SX1280Hal::ReadBuffer
 
-#break SX1280Driver::RXnbISR
-#break SX1280Driver::GetRxBufferAddr
+break main
+#break ProcessRFPacket
+break GCM::decrypt
 
-#RXdoneISR
-break ProcessRFPacket
+define pp
+next
+next
+next
+p/x Radio.RXdataBuffer@2
+c
+end

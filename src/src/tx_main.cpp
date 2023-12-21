@@ -78,7 +78,11 @@ StubbornReceiver TelemetryReceiver;
 StubbornSender MspSender;
 uint8_t CRSFinBuffer[CRSF_MAX_PACKET_LEN+1];
 
+#if defined(USE_LEA)
 GCM lea_gcm;
+unsigned long lea_elapsedTime;
+unsigned long lea_processTime;
+#endif
 
 device_affinity_t ui_devices[] = {
   {&CRSF_device, 1},
@@ -183,7 +187,19 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
     return false;
   }
 
+#if defined(USE_LEA)
+  uint8_t payload[OTA4_LEA_PACKET_SIZE*2];
+
+  if (lea_gcm.decrypt((OTA_Packet_s *)Radio.RXdataBuffer, payload, OTA4_LEA_PACKET_SIZE*2) != 0)
+  {
+      DBGLN("LEA GCM encrypt error");
+      return false;
+  }
+
+  OTA_Packet_s * const otaPktPtr = (OTA_Packet_s * const)payload;
+#else
   OTA_Packet_s * const otaPktPtr = (OTA_Packet_s * const)Radio.RXdataBuffer;
+#endif
   if (!OtaValidatePacketCrc(otaPktPtr))
   {
     DBGLN("TLM crc error");
@@ -362,7 +378,11 @@ void SetRFLinkRate(uint8_t index) // Set speed of RF link (hz)
 #endif
   hwTimer::updateInterval(interval);
   Radio.Config(ModParams->bw, ModParams->sf, ModParams->cr, GetInitialFreq(),
+#if defined(USE_LEA)
+               ModParams->PreambleLen, invertIQ, OTA4_LEA_PACKET_SIZE * 2, ModParams->interval
+#else
                ModParams->PreambleLen, invertIQ, ModParams->PayloadLength, ModParams->interval
+#endif
 #if defined(RADIO_SX128X)
                , uidMacSeedGet(), OtaCrcInitializer, (ModParams->radio_type == RADIO_TYPE_SX128x_FLRC)
 #endif
@@ -575,17 +595,19 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
 #endif
 
 #if defined(USE_LEA)
-  uint8_t payload[OTA8_LEA_PACKET_SIZE*2];
-  int payloadLength = OTA8_LEA_PACKET_SIZE*2;
-  //int payloadLength = ExpressLRS_currAirRate_Modparams->PayloadLength,
-  if (lea_gcm.encrypt(&otaPkt, payload, 32) != 0)
-  {
+  uint8_t payload[OTA4_LEA_PACKET_SIZE * 2];
+  uint8_t payload_test[OTA4_LEA_PACKET_SIZE * 2] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31};
+  lea_elapsedTime = micros();
+
+  if (lea_gcm.encrypt(&otaPkt, payload, 32) != 0) {
     DBGLN("LEA GCM encrypt error");
     return;
   }
 
-  Radio.TXnb(payload, payloadLength, transmittingRadio);
+  lea_processTime = micros() - lea_elapsedTime;
+  Radio.TXnb((uint8_t*)payload, OTA4_LEA_PACKET_SIZE * 2, transmittingRadio);
 #else
+  //  delayMicroseconds(500);
   Radio.TXnb((uint8_t*)&otaPkt, ExpressLRS_currAirRate_Modparams->PayloadLength, transmittingRadio);
 #endif
 }

@@ -1,13 +1,11 @@
-#gdb-multiarch -x .pioinit-rx
-#gdb-multiarch -x .pioinit-rx
-#~/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gdb -x .pioinit-rx
+#!/bin/sh
 
 case "$1" in
   "TX")
-    ~/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gdb -x .pioinit-tx
+    gdb-multiarch -x .pioinit-tx
     ;;
 	"RX")
-    ~/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gdb -x .pioinit-rx
+    gdb-multiarch -x .pioinit-rx
     ;;
 	 *)
      echo "TX or RX"

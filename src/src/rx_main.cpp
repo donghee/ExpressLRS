@@ -338,7 +338,11 @@ void SetRFLinkRate(uint8_t index) // Set speed of RF link
 #endif
     hwTimer::updateInterval(interval);
     Radio.Config(ModParams->bw, ModParams->sf, ModParams->cr, GetInitialFreq(),
+#if defined(USE_LEA)
+                 ModParams->PreambleLen, invertIQ, OTA4_LEA_PACKET_SIZE*2, 0
+#else
                  ModParams->PreambleLen, invertIQ, ModParams->PayloadLength, 0
+#endif
 #if defined(RADIO_SX128X)
                  , uidMacSeedGet(), OtaCrcInitializer, (ModParams->radio_type == RADIO_TYPE_SX128x_FLRC)
 #endif
@@ -514,7 +518,18 @@ bool ICACHE_RAM_ATTR HandleSendTelemetryResponse()
         transmittingRadio = SX12XX_Radio_NONE;
     }
 
+#if defined(USE_LEA)
+    uint8_t payload[OTA4_LEA_PACKET_SIZE*2];
+    if (lea_gcm.encrypt(&otaPkt, payload, 32) != 0)
+    {
+      DBGLN("LEA GCM encrypt error");
+      return false;
+    }
+
+    Radio.TXnb(payload, OTA4_LEA_PACKET_SIZE*2, transmittingRadio);
+#else
     Radio.TXnb((uint8_t*)&otaPkt, ExpressLRS_currAirRate_Modparams->PayloadLength, transmittingRadio);
+#endif
 
     return true;
 }
@@ -1002,9 +1017,9 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
     uint32_t const beginProcessing = micros();
 
 #if defined(USE_LEA)
-    uint8_t payload[OTA8_LEA_PACKET_SIZE*2];
+    uint8_t payload[OTA4_LEA_PACKET_SIZE*2];
 
-    if (lea_gcm.decrypt((OTA_Packet_s *)Radio.RXdataBuffer, payload, 32) != 0)
+    if (lea_gcm.decrypt((OTA_Packet_s *)Radio.RXdataBuffer, payload, OTA4_LEA_PACKET_SIZE*2) != 0)
     {
         DBGLN("LEA GCM encrypt error");
         return false;

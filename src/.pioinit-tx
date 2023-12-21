@@ -1,19 +1,17 @@
-# openocd or jlink
+#openocd or jlink
 file .pio/build/LEA_2400_TX_via_STLINK/firmware.elf
 target remote localhost:2331
 monitor reset
-#monitor flash erase
+set mem inaccessible-by-default off
 load
-break main
-#break SystemClock_Config()
-#break SX1280Hal::init()
-#break loop()
-#break SPIEx
-#break setup
 
-#break WS281Binit()
-#break WS281BsetLED()
-#break CRSF::Begin()
-#break CRSF::ProcessPacket()
+#break main
+#break SendRCdataToRF
+#break tx_main.cpp:602
+break tx_main.cpp:554
 
-#break serialEventRun()
+define pp
+p/x payload
+next
+c
+end

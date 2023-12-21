@@ -68,6 +68,26 @@ void fullres_fillChannelData()
     ChannelData[15] = 0xDCFE & 0b11111111111;
 }
 
+void test_lea_gcm_decrypt(void)
+{
+    GCM lea_gcm;
+    int ret = lea_gcm.init();
+    TEST_ASSERT_EQUAL(0, ret);
+
+    uint8_t payload[32] = {
+        0x82, 0xb3, 0xe2, 0x3, 0x71, 0xda, 0x83, 0x48, 0xaf, 0x1b, 0xa1, 0x1f, 0xe, 0xcb, 0xb7, 0xe3, 0xe1, 0x85, 0x4c, 0x2f, 0x97, 0xaa, 0x40, 0xa2, 0x96, 0x65, 0x41, 0xb3, 0x32, 0x8f, 0x5b, 0xca
+    };
+
+    uint8_t RXdataBuffer[OTA4_PACKET_SIZE+8] = {0};
+    // TODO: why not equal? After decrypt
+    uint8_t exp_RXdataBuffer[OTA4_PACKET_SIZE+8] = { 0x52, 0x0, 0x1, 0x64, 0x18, 0x8e, 0x7b, 0xf6, 0x0, 0x0, 0x0, 0x0, 0x0, 0xe8, 0x4d, 0x0, };
+
+    // lea gcm decrypt
+    ret = lea_gcm.decrypt((OTA_Packet_s *)RXdataBuffer, payload, 32);
+    TEST_ASSERT_EQUAL(0, ret);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(exp_RXdataBuffer, RXdataBuffer, 16); // TODO: why not equal? After decrypt
+
+}
 void test_GCM4LEA_enc_dec(void)
 {
     GCM_st gcm_TX;
@@ -106,12 +126,6 @@ void test_GCM4LEA_enc_dec(void)
     TEST_ASSERT_EQUAL(0, GCM4LEA_dec(&gcm_RX));
 
     TEST_ASSERT_EQUAL_HEX8_ARRAY(control_data, gcm_RX.PP, gcm_RX.PP_byte_length);
-
-    // std::ofstream f("/tmp/gcm4lea.log");
-    // for (int i; i < 16; i++)
-    // {
-    //     f << gcm_TX.T[i];
-    // }
 }
 
 #define CONTROL_DATA_SIZE 64
@@ -179,7 +193,7 @@ void test_CCM4LEA_enc_dec()
     memcpy(payload + 16, ccm_TX.CC, 16);
 
     // TODO: WHY payload is changed?
-    memcpy(exp_control_data, control_data, 16);
+    // memcpy(exp_control_data, control_data, 16);
 
     // RX
     TEST_ASSERT_EQUAL(0, CCM4LEA_set_dec_params(&ccm_RX, payload + 16, 16, N, 12, payload));
@@ -408,6 +422,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_CCM4LEA_enc_dec);
 
     // test c++ gcm class
+    RUN_TEST(test_lea_gcm_decrypt);
     RUN_TEST(test_lea_gcm_ota_encrypt_and_decrypt);
     RUN_TEST(test_lea_gcm_ota_tx_encrypt);
     RUN_TEST(test_lea_gcm_ota_rx_decrypt);

@@ -1,3 +1,5 @@
+#!/bin/sh
+
 case "$1" in
   "TX")
 pio run -e LEA_2400_TX_via_STLINK --target clean && pio debug -e LEA_2400_TX_via_STLINK
