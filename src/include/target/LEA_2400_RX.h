@@ -2,7 +2,6 @@
 #define DEVICE_NAME "LEA RX"
 #endif
 // There is some special handling for this target
-//#define TARGET_RX_GHOST_ATTO_V1
 #define TARGET_RX_LEA
 
 // GPIO pin definitions
@@ -19,6 +18,7 @@
 #define GPIO_PIN_RCSIGNAL_RX        PA_10
 #define GPIO_PIN_RCSIGNAL_TX        PA_9
 
+#define GPIO_PIN_LED            PB_5
 //#define GPIO_PIN_LED            PA7
 //#define GPIO_PIN_LED_WS2812      PA7
 //#define GPIO_PIN_LED_WS2812_FAST PA_7

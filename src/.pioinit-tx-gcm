@@ -1,14 +1,16 @@
 #openocd or jlink
-file .pio/build/LEA_2400_TX_via_STLINK/firmware.elf
+file .pio/build/LEA_2400_TX_GCM_TEST/firmware.elf
 target extended-remote localhost:2331
 monitor reset
 set mem inaccessible-by-default off
 load
 
-#break main
+break main
+break setup
+#reak Radio.Begin
 #break SendRCdataToRF
 #break tx_main.cpp:602
-break tx_main.cpp:554
+#break tx_main.cpp:554
 
 define pp
 p/x payload

@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# gdbgui --gdb-cmd="gdb-multiarch -n -x .pioinit-rx" --args ./.pio/build/LEA_2400_RX_via_STLINK/firmware.bin
+# gdbfrontend -g $(realpath /usr/bin/gdb-multiarch) --gdb-args="-n -x .pioinit-rx"
+
 case "$1" in
   "TX")
     gdb-multiarch -x .pioinit-tx

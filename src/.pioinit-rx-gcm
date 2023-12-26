@@ -1,0 +1,22 @@
+# blackmagic probe
+file .pio/build/LEA_2400_RX_GCM_TEST/firmware.elf
+target extended-remote /dev/ttyBmpGdb
+monitor reset
+monitor swdp_scan
+attach 1
+set mem inaccessible-by-default off
+load .pio/build/LEA_2400_RX_GCM_TEST/firmware.elf
+
+break main
+#break setup
+break RXdoneCallback
+#break ProcessRFPacket
+#break GCM::decrypt
+
+define pp
+next
+next
+next
+p/x Radio.RXdataBuffer@2
+c
+end
