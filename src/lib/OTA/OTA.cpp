@@ -504,6 +504,7 @@ bool ICACHE_RAM_ATTR ValidatePacketCrcStd(OTA_Packet_s * const otaPktPtr)
     {
         otaPktPtr->std.crcHigh = 0;
     }
+    otaPktPtr->std.crcHigh = 1;
     uint16_t const calculatedCRC =
         ota_crc.calc((uint8_t*)otaPktPtr, OTA4_CRC_CALC_LEN, OtaCrcInitializer);
     return inCRC == calculatedCRC;
@@ -523,6 +524,7 @@ void ICACHE_RAM_ATTR GeneratePacketCrcStd(OTA_Packet_s * const otaPktPtr)
         otaPktPtr->std.crcHigh = (OtaNonce % ExpressLRS_currAirRate_Modparams->FHSShopInterval) + 1;
     }
 #endif
+    otaPktPtr->std.crcHigh = 1;
     uint16_t crc = ota_crc.calc((uint8_t*)otaPktPtr, OTA4_CRC_CALC_LEN, OtaCrcInitializer);
     otaPktPtr->std.crcHigh = (crc >> 8);
     otaPktPtr->std.crcLow  = crc;
