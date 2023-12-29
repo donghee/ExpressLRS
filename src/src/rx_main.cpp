@@ -394,7 +394,7 @@ bool ICACHE_RAM_ATTR HandleFHSS()
     }
     else
     {
-        Radio.SetFrequencyReg(FHSSgetNextFreq());
+      //        Radio.SetFrequencyReg(FHSSgetNextFreq());
     }
 
 #if defined(RADIO_SX127X)

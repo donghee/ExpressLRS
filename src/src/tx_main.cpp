@@ -420,7 +420,7 @@ void ICACHE_RAM_ATTR HandleFHSS()
     }
     else
     {
-      Radio.SetFrequencyReg(FHSSgetNextFreq());
+      //      Radio.SetFrequencyReg(FHSSgetNextFreq());
     }
   }
 }
@@ -428,7 +428,7 @@ void ICACHE_RAM_ATTR HandleFHSS()
 void ICACHE_RAM_ATTR HandlePrepareForTLM()
 {
   // If TLM enabled and next packet is going to be telemetry, start listening to have a large receive window (time-wise)
-  if (ExpressLRS_currTlmDenom != 1 && ((OtaNonce + 1) % ExpressLRS_currTlmDenom) == 0)
+  if (ExpressLRS_currTlmDenom != 1 && ((OtaNonce) % 40) == 0)
   {
     Radio.RXnb();
     TelemetryRcvPhase = ttrpPreReceiveGap;
