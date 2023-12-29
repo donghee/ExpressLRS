@@ -3,60 +3,89 @@
 #include "SX1280Driver.h"
 #include "common.h"
 #include "FHSS.h"
+#include "gcm.h"
 
-// SX1280Driver Radio;
+#define DATA_SIZE 32
 
 SX12XX_Radio_Number_t transmittingRadio = Radio.GetLastSuccessfulPacketRadio();
+GCM lea_gcm;
 
-uint8_t testdata[8] = {7, 6, 5, 4, 3, 2, 1, 0};
+WORD_ALIGNED_ATTR OTA_Packet_s otaPkt = {0};
+uint8_t ciphertext[DATA_SIZE] = { 0 };
+uint8_t testtext[DATA_SIZE] = { 0 };
 
 void ICACHE_RAM_ATTR TXdoneCallback()
 {
-  //    Serial.println("TXdoneCallback");
-    delayMicroseconds(100);
-    Radio.TXnb(testdata, sizeof(testdata), transmittingRadio);
+  int ret = 0;
+  //  delayMicroseconds(100);
+  memcpy(testtext, &otaPkt, sizeof(otaPkt));
+
+  ret = lea_gcm.encrypt(&otaPkt, ciphertext, 32);
+  if (ret != 0) {
+    DBGLN("LEA GCM encrypt error");
+    return;
+  }
+
+  uint8_t plaintext[DATA_SIZE];
+  ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) ciphertext, 32);
+  if (ret != 0) {
+    DBGLN("LEA GCM decrypt error");
+  }
+
+  Radio.TXnb(ciphertext, sizeof(ciphertext), transmittingRadio);
 }
 
 bool ICACHE_RAM_ATTR RXdoneCallback(SX12xxDriverCommon::rx_status const status)
 {
-  //    Serial.println("RXdoneCallback");
-    for (int i = 0; i < 8; i++)
-    {
-        Serial.print(Radio.RXdataBuffer[i], HEX);
-        Serial.print(",");
-    }
-    Serial.println("");
-    //Radio.RXnb();
-    return true;
+  for (int i = 0; i < 8; i++)
+  {
+    Serial.print(Radio.RXdataBuffer[i], HEX);
+    Serial.print(",");
+  }
+  Serial.println("");
+  //Radio.RXnb();
+  return true;
 }
 
 void setup()
 {
-    Serial.begin(115200);
-    Serial.println("Begin SX1280 testing...");
 
-    Radio.Begin();
-    //    Radio.Config(SX1280_LORA_BW_0800, SX1280_LORA_SF6, SX1280_LORA_CR_4_7, 2420000000, SX1280_PREAMBLE_LENGTH_32_BITS);
-    Radio.Config(SX1280_LORA_BW_0800, SX1280_LORA_SF6, SX1280_LORA_CR_LI_4_8, 0xba1b91, 12, true, 8, 20000, 0, 0, 0);
-    // Radio.Config(SX1280_LORA_BW_0800, SX1280_LORA_SF8, SX1280_LORA_CR_LI_4_8, 2420000000, 12, false, 8, 20000, 0, 0, 0);
-    Radio.TXdoneCallback = &TXdoneCallback;
-    Radio.RXdoneCallback = &RXdoneCallback;
-    Radio.SetFrequencyHz(2420000000, transmittingRadio);
-    //    Radio.RXnb();
+  otaPkt.std.type = 0;
+  otaPkt.std.crcHigh = 0;
+  otaPkt.std.rc.ch.raw[0] = 1;
+  otaPkt.std.rc.ch.raw[1] = 2;
+  otaPkt.std.rc.ch.raw[2] = 3;
+  otaPkt.std.rc.ch.raw[3] = 4;
+  otaPkt.std.rc.ch.raw[4] = 5;
+  otaPkt.std.rc.switches = 6;
+  otaPkt.std.rc.ch4 = 0;
+  otaPkt.std.crcLow = 7;
 
-    Radio.TXnb(testdata, sizeof(testdata), transmittingRadio);
+
+  lea_gcm.init();
+
+  Serial.begin(115200);
+  Serial.println("Begin SX1280 testing...");
+
+  Radio.Begin();
+  Radio.Config(SX1280_LORA_BW_0800, SX1280_LORA_SF6, SX1280_LORA_CR_LI_4_8, 0xba1b91, 12, true, DATA_SIZE, 20000, 0, 0, 0);
+  Radio.TXdoneCallback = &TXdoneCallback;
+  Radio.RXdoneCallback = &RXdoneCallback;
+  Radio.SetFrequencyHz(2420000000, transmittingRadio);
+  //    Radio.RXnb();
+
+
+  //OTA_Packet_s * const otaPktPtr = (OTA_Packet_s * const)plaintext;
+
+  if (lea_gcm.encrypt(&otaPkt, ciphertext, 32) != 0) {
+    DBGLN("LEA GCM encrypt error");
+    return;
+  }
+
+  Radio.TXnb(ciphertext, sizeof(ciphertext), transmittingRadio);
+  //Radio.TXnb(testdata, sizeof(testdata), transmittingRadio);
 }
 
 void loop()
 {
-    // Serial.println("about to TX");
-  //    Radio.TXnb(testdata, sizeof(testdata), transmittingRadio);
-    //delay(1000);
-
-    // Serial.println("about to RX");
-    //Radio.RXnb();
-    delay(100);
-    //delay(random(50,200));
-    //delay(100);
-    //    yield();
 }

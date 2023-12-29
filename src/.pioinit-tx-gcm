@@ -6,14 +6,4 @@ set mem inaccessible-by-default off
 load
 
 break main
-break setup
-#reak Radio.Begin
-#break SendRCdataToRF
-#break tx_main.cpp:602
-#break tx_main.cpp:554
-
-define pp
-p/x payload
-next
-c
-end
+break TXdoneCallback

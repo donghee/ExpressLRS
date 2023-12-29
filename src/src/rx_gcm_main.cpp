@@ -3,39 +3,34 @@
 #include "SX1280Driver.h"
 #include "common.h"
 #include "FHSS.h"
+#include "gcm.h"
 
-//SX1280Driver Radio;
+#define DATA_SIZE 32
 
 SX12XX_Radio_Number_t transmittingRadio = Radio.GetLastSuccessfulPacketRadio();
-
-uint8_t testdata[8] = {0x80};
+GCM lea_gcm;
 
 void ICACHE_RAM_ATTR TXdoneCallback()
 {
     Serial.println("TXdoneCallback1");
-    //delay(1000);
-    //Radio.TXnb(testdata, sizeof(testdata));
 }
 
 bool ICACHE_RAM_ATTR RXdoneCallback(SX12xxDriverCommon::rx_status const status)
 {
-    // Serial.println("RXdoneCallback");
-    // for (int i = 0; i < 8; i++)
-    // {
-    //     Serial.print(Radio.RXdataBuffer[i], HEX);
-    //     Serial.print(",");
-    // }
-    // Serial.println("");
+    uint8_t plaintext[DATA_SIZE];
+    int ret = 0;
+    ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, 32);
+
     Radio.RXnb();
-
-    digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
-    //    delay(500);
-
+    if (ret == 0)
+      digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
     return true;
 }
 
 void setup()
 {
+    lea_gcm.init();
+
     pinMode(GPIO_PIN_LED, OUTPUT);
     digitalWrite(GPIO_PIN_LED, HIGH);
 
@@ -43,7 +38,7 @@ void setup()
     Serial.println("Begin SX1280 testing...");
 
     Radio.Begin();
-    Radio.Config(SX1280_LORA_BW_0800, SX1280_LORA_SF6, SX1280_LORA_CR_LI_4_8, 0xba1b91, 12, true, 8, 20000, 0, 0, 0);
+    Radio.Config(SX1280_LORA_BW_0800, SX1280_LORA_SF6, SX1280_LORA_CR_LI_4_8, 0xba1b91, 12, true, DATA_SIZE, 20000, 0, 0, 0);
     //Radio.Config(SX1280_LORA_BW_0800, SX1280_LORA_SF8, SX1280_LORA_CR_LI_4_8, 2420000000, 12, false, 8, 20000, 0, 0, 0);
     Radio.TXdoneCallback = &TXdoneCallback;
     Radio.RXdoneCallback = &RXdoneCallback;
@@ -55,13 +50,4 @@ void setup()
 
 void loop()
 {
-  //    digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
-  //    delay(500);
-    //delay(250);
-    //Serial.println("about to TX");
-    //Radio.TXnb(testdata, 8, transmittingRadio);
-
-    // Serial.println("about to RX");
-  //Radio.RXnb();
-    // delay(random(50,200));
 }
