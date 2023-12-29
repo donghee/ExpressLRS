@@ -70,7 +70,7 @@ int GCM::decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen) 
     }
 
     // otaPktPtr = (OTA_Packet_s *)gcm_RX.PP;
-    memcpy((uint8_t *)otaPktPtr, (uint8_t *)gcm_RX.PP, gcm_RX.PP_byte_length);
+    memcpy((uint8_t *)otaPktPtr, (uint8_t *)gcm_RX.PP, 16);
 
     is_ok = 0;
 
