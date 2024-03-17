@@ -5,10 +5,10 @@
 
 case "$1" in
   "TX")
-    gdb-multiarch -x .pioinit-tx-gcm
+    gdb-multiarch -q -x .pioinit-tx-gcm
     ;;
 	"RX")
-    gdb-multiarch -x .pioinit-rx-gcm
+    gdb-multiarch -q -x .pioinit-rx-gcm
     ;;
 	 *)
      echo "TX or RX"
