@@ -6,6 +6,8 @@
 #include "gcm.h"
 #include "rsa.h"
 
+#define assert(c) if (!(c)) __BKPT()
+
 #define DATA_SIZE 32
 
 SX12XX_Radio_Number_t transmittingRadio = Radio.GetLastSuccessfulPacketRadio();
@@ -55,7 +57,7 @@ void setup()
     unsigned char pubkey[1024] = {0};
     size_t pubkey_len = 0;
 
-    // generate key
+    // generate public key
     RSA rsa;
     ret = rsa.generate_key(pers, strlen(pers));
     if ( ret != 0 )
@@ -64,7 +66,7 @@ void setup()
     if ( ret != 0 )
         DBGLN("FAILED EXPORT PUBKEY");
 
-    // encrypt using public key
+    // encrypt using generated public key
     unsigned char plaintext_pub[1024] = {0};
     unsigned char ciphertext_pub[512] = {0};
     plaintext_pub[0] = 0x04; plaintext_pub[1] = 0x03; plaintext_pub[2] = 0x02; plaintext_pub[3] = 0x01; plaintext_pub[4] = 0x00;
@@ -85,12 +87,11 @@ void setup()
 
     // decrypt using original key
     ret = rsa.decrypt(ciphertext, decryptedtext, &i, 1024);
-    __BKPT();
+    assert(memcmp(plaintext, decryptedtext, 5) == 0);
     ret = rsa.decrypt(ciphertext_pub, decryptedtext, &i, 1024);
     if( ret != 0 )
         DBGLN("FAILED DECRYPT");
-
-    __BKPT();
+    assert(memcmp(plaintext_pub, decryptedtext, 5) == 0);
 
   otaPkt.std.type = 0;
   otaPkt.std.crcHigh = 0;

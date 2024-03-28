@@ -1,12 +1,14 @@
 #include "rsa.h"
 
-RSA::RSA() {
+void RSA::init()
+{
     mbedtls_entropy_init( &entropy_ );
     mbedtls_ctr_drbg_init( &ctr_drbg_);
     mbedtls_rsa_init( &rsa_, MBEDTLS_RSA_PKCS_V15, 0);
 }
 
-RSA::~RSA() {
+void RSA::deinit()
+{
     mbedtls_rsa_free(&rsa_);
     mbedtls_ctr_drbg_free(&ctr_drbg_);
     mbedtls_entropy_free( &entropy_ );

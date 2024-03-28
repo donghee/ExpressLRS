@@ -5,6 +5,8 @@
 #include "FHSS.h"
 #include "gcm.h"
 
+#define assert(c) if (!(c)) __BKPT()
+
 #define DATA_SIZE 32
 
 SX12XX_Radio_Number_t transmittingRadio = Radio.GetLastSuccessfulPacketRadio();
