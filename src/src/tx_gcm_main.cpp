@@ -14,29 +14,82 @@ SX12XX_Radio_Number_t transmittingRadio = Radio.GetLastSuccessfulPacketRadio();
 GCM lea;
 
 WORD_ALIGNED_ATTR OTA_Packet_s otaPkt = {0};
+
+// lea
 uint8_t ciphertext[DATA_SIZE] = { 0 };
 uint8_t testtext[DATA_SIZE] = { 0 };
 
+// rsa
+unsigned char pubkey[1024] = {0};
+size_t pubkey_len = 0;
+int pubkey_msg_num = 0;
+
+// handshake
+#include <stubborn_sender.h>
+StubbornSender sender;
+uint8_t packageIndex;
+uint8_t data[8];
+bool confirmValue = true;
+uint8_t batterySequence[] = {0xEC,10,0x08,0,0,0,0,0,0,0,1,109};
+
+// void ICACHE_RAM_ATTR TXdoneCallback()
+// {
+//   int ret = 0;
+//   //  delayMicroseconds(100);
+//   memcpy(testtext, &otaPkt, sizeof(otaPkt));
+//
+//   ret = lea.encrypt(&otaPkt, ciphertext, 32);
+//   if (ret != 0) {
+//     DBGLN("LEA GCM encrypt error");
+//     return;
+//   }
+//
+//   uint8_t plaintext[DATA_SIZE];
+//   ret = lea.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) ciphertext, 32);
+//   if (ret != 0) {
+//     DBGLN("LEA GCM decrypt error");
+//   }
+//
+//   digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
+//   // Radio.TXnb(ciphertext, sizeof(ciphertext), transmittingRadio);
+//
+//   Radio.TXnb(pubkey+pubkey_msg_num, 32, transmittingRadio);
+//   if (pubkey_msg_num >= 224) {
+//     pubkey_msg_num = 0;
+//   } else {
+//     pubkey_msg_num += 32;
+//   }
+// }
+
+enum handshake_state_t {
+  HANDSHAKE_INIT,
+  HANDSHAKE_HELLO,
+  HANDSHAKE_SEND_PUBKEY,
+  HANDSHAKE_DONE
+};
+
+handshake_state_t handshake_state = HANDSHAKE_INIT;
+
 void ICACHE_RAM_ATTR TXdoneCallback()
 {
-  int ret = 0;
-  //  delayMicroseconds(100);
-  memcpy(testtext, &otaPkt, sizeof(otaPkt));
-
-  ret = lea.encrypt(&otaPkt, ciphertext, 32);
-  if (ret != 0) {
-    DBGLN("LEA GCM encrypt error");
-    return;
-  }
-
-  uint8_t plaintext[DATA_SIZE];
-  ret = lea.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) ciphertext, 32);
-  if (ret != 0) {
-    DBGLN("LEA GCM decrypt error");
-  }
-
   digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
-  Radio.TXnb(ciphertext, sizeof(ciphertext), transmittingRadio);
+
+  if (handshake_state == HANDSHAKE_HELLO) {
+    handshake_state = HANDSHAKE_SEND_PUBKEY;
+    packageIndex = sender.GetCurrentPayload(data, sizeof(data));
+    sender.ConfirmCurrentPayload(confirmValue);
+    confirmValue = !confirmValue;
+  } else if (handshake_state == HANDSHAKE_SEND_PUBKEY) {
+    if (packageIndex == 0) { // last package
+      handshake_state  = HANDSHAKE_DONE;
+      return;
+    }
+    packageIndex = sender.GetCurrentPayload(data, sizeof(data));
+    sender.ConfirmCurrentPayload(confirmValue);
+    confirmValue = !confirmValue;
+  }
+
+  Radio.TXnb(data, sizeof(data), transmittingRadio);
 }
 
 bool ICACHE_RAM_ATTR RXdoneCallback(SX12xxDriverCommon::rx_status const status)
@@ -56,8 +109,6 @@ void rsa_test()
 {
     int ret = 1;
     const char *pers = "rsa_genkey";
-    unsigned char pubkey[1024] = {0};
-    size_t pubkey_len = 0;
 
     // generate public key
     RSA rsa;
@@ -98,7 +149,20 @@ void rsa_test()
     assert(memcmp(plaintext_pub, decryptedtext, 5) == 0);
 
     //Radio.TXnb(pubkey, pubkey_len, transmittingRadio); // pubkey_len is 256
-    Radio.TXnb(pubkey, 32, transmittingRadio);
+    //Radio.TXnb(pubkey, 32, transmittingRadio);
+}
+
+void handshake_test()
+{
+  //sender.setMaxPackageIndex(ELRS4_TELEMETRY_MAX_PACKAGES);
+  sender.setMaxPackageIndex(255>>1);
+  sender.ResetState();
+  // sender.SetDataToTransmit(pubkey, pubkey_len); // pubkey_len is 256, so max packageIndex is 32, since 256/8 = 32
+  sender.SetDataToTransmit(pubkey, 32);
+  // sender.SetDataToTransmit(batterySequence, sizeof(batterySequence)); // pubkey_len is 256, so max packageIndex is 32, since 256/8 = 32
+
+  handshake_state  = HANDSHAKE_HELLO;
+  Radio.TXnb((uint8_t*)"hello", 5, transmittingRadio);
 }
 
 void lea_test()
@@ -142,9 +206,15 @@ void setup()
   Radio.RXdoneCallback = &RXdoneCallback;
   Radio.SetFrequencyHz(2420000000, transmittingRadio);
 
-  lea_test();
+  rsa_test();
+  // lea_test();
+  handshake_test();
 }
 
 void loop()
 {
+  if (handshake_state == HANDSHAKE_DONE) {
+    handshake_state  = HANDSHAKE_INIT;
+    handshake_test();
+  }
 }

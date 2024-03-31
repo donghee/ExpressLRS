@@ -5,6 +5,5 @@ monitor reset
 set mem inaccessible-by-default off
 load
 
-break main
-#break src/tx_gcm_main.cpp:226
-#break src/tx_gcm_main.cpp:145
+#break main
+c

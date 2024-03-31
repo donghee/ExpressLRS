@@ -7,5 +7,9 @@ attach 1
 set mem inaccessible-by-default off
 load .pio/build/LEA_2400_RX_GCM_TEST/firmware.elf
 
+define rr
+c
+p/x Radio.RXdataBuffer
+end
+
 break main
-break RXdoneCallback

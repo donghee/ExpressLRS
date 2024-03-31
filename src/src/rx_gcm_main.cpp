@@ -12,6 +12,20 @@
 SX12XX_Radio_Number_t transmittingRadio = Radio.GetLastSuccessfulPacketRadio();
 GCM lea_gcm;
 
+// rsa
+unsigned char pubkey[1024] = {0};
+size_t pubkey_len = 0;
+int pubkey_msg_num = 0;
+
+enum handshake_state_t {
+  HANDSHAKE_INIT,
+  HANDSHAKE_WAIT_HELLO,
+  HANDSHAKE_WAIT_PUBKEY,
+  HANDSHAKE_DONE
+};
+
+handshake_state_t handshake_state = HANDSHAKE_INIT;
+
 void ICACHE_RAM_ATTR TXdoneCallback()
 {
     Serial.println("TXdoneCallback1");
@@ -19,14 +33,34 @@ void ICACHE_RAM_ATTR TXdoneCallback()
 
 bool ICACHE_RAM_ATTR RXdoneCallback(SX12xxDriverCommon::rx_status const status)
 {
-    __BKPT();
-    uint8_t plaintext[DATA_SIZE];
-    int ret = 0;
-    ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, 32);
 
-    if (ret == 0)
-      digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
-    delay(100);
+    // uint8_t plaintext[DATA_SIZE];
+    // int ret = 0;
+    // ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, 32);
+    //
+    // if (ret == 0)
+    //   digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
+    // delay(100);
+
+    if (Radio.RXdataBuffer[0] == 'h' && Radio.RXdataBuffer[1] == 'e' &&
+        Radio.RXdataBuffer[2] == 'l' && Radio.RXdataBuffer[3] == 'l' &&
+        Radio.RXdataBuffer[4] == 'o' && handshake_state == HANDSHAKE_WAIT_HELLO) {
+        digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
+        handshake_state = HANDSHAKE_WAIT_PUBKEY;
+        pubkey_msg_num = 0;
+    } else if (handshake_state == HANDSHAKE_WAIT_PUBKEY) {
+        memcpy(pubkey+pubkey_msg_num, Radio.RXdataBuffer, 8);
+        pubkey_msg_num += 8;
+        if (pubkey_msg_num >= 32)
+            handshake_state = HANDSHAKE_DONE;
+    } else if (handshake_state == HANDSHAKE_DONE) {
+        // handshake_state = HANDSHAKE_INIT;
+        __BKPT();
+        // DEBUG
+        memset(pubkey, 0, 32);
+        handshake_state = HANDSHAKE_WAIT_HELLO;
+    }
+
     Radio.RXnb();
     return true;
 }
@@ -47,6 +81,8 @@ void setup()
     Radio.TXdoneCallback = &TXdoneCallback;
     Radio.RXdoneCallback = &RXdoneCallback;
     Radio.SetFrequencyHz(2420000000, transmittingRadio);
+
+    handshake_state = HANDSHAKE_WAIT_HELLO;
     Radio.RXnb();
 }
 
