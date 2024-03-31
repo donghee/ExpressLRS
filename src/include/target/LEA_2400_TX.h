@@ -29,6 +29,7 @@
 // #define GPIO_PIN_RCSIGNAL_TX        PA_9  // Needed for CRSF libs but does nothing/not hooked up to JR module.
 #define GPIO_PIN_RCSIGNAL_RX        PA_3 // S.PORT (Only needs one wire )
 #define GPIO_PIN_RCSIGNAL_TX        PA_2  // Needed for CRSF libs but does nothing/not hooked up to JR module.
+#define GPIO_PIN_LED            PB_5
 #define GPIO_PIN_LED_WS2812         PB_6
 #define GPIO_PIN_LED_WS2812_FAST    PB_6
 // #define GPIO_PIN_PA_ENABLE          PB11  // https://www.skyworksinc.com/-/media/SkyWorks/Documents/Products/2101-2200/SE2622L_202733C.pdf
