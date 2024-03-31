@@ -19,13 +19,15 @@ void ICACHE_RAM_ATTR TXdoneCallback()
 
 bool ICACHE_RAM_ATTR RXdoneCallback(SX12xxDriverCommon::rx_status const status)
 {
+    __BKPT();
     uint8_t plaintext[DATA_SIZE];
     int ret = 0;
     ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, 32);
 
-    Radio.RXnb();
     if (ret == 0)
       digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
+    delay(100);
+    Radio.RXnb();
     return true;
 }
 
@@ -47,8 +49,6 @@ void setup()
     Radio.SetFrequencyHz(2420000000, transmittingRadio);
     Radio.RXnb();
 }
-
-
 
 void loop()
 {
