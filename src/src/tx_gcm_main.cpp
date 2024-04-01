@@ -53,7 +53,7 @@ uint8_t batterySequence[] = {0xEC,10,0x08,0,0,0,0,0,0,0,1,109};
 //   digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
 //   // Radio.TXnb(ciphertext, sizeof(ciphertext), transmittingRadio);
 //
-//   Radio.TXnb(pubkey+pubkey_msg_num, 32, transmittingRadio);
+//   Radio.TXnb(pubkey + pubkey_msg_num, 32, transmittingRadio);
 //   if (pubkey_msg_num >= 224) {
 //     pubkey_msg_num = 0;
 //   } else {
@@ -64,29 +64,49 @@ uint8_t batterySequence[] = {0xEC,10,0x08,0,0,0,0,0,0,0,1,109};
 enum handshake_state_t {
   HANDSHAKE_INIT,
   HANDSHAKE_HELLO,
-  HANDSHAKE_SEND_PUBKEY,
+  HANDSHAKE_SEND_RSA_PUBKEY,
+  HANDSHAKE_RECV_LEA_KEY,
   HANDSHAKE_DONE
 };
 
 handshake_state_t handshake_state = HANDSHAKE_INIT;
+int pubkey_msg_seq = 0;
+
+uint8_t handshake_send_pubkey()
+{
+    uint8_t packageIndex_;
+    packageIndex_ = sender.GetCurrentPayload(data, sizeof(data));
+    sender.ConfirmCurrentPayload(confirmValue);
+    confirmValue = !confirmValue;
+    return packageIndex_;
+}
 
 void ICACHE_RAM_ATTR TXdoneCallback()
 {
   digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
 
   if (handshake_state == HANDSHAKE_HELLO) {
-    handshake_state = HANDSHAKE_SEND_PUBKEY;
-    packageIndex = sender.GetCurrentPayload(data, sizeof(data));
-    sender.ConfirmCurrentPayload(confirmValue);
-    confirmValue = !confirmValue;
-  } else if (handshake_state == HANDSHAKE_SEND_PUBKEY) {
-    if (packageIndex == 0) { // last package
+    // start sending pubkey
+    handshake_state = HANDSHAKE_SEND_RSA_PUBKEY;
+    sender.setMaxPackageIndex(ELRS4_TELEMETRY_MAX_PACKAGES);
+    sender.ResetState();
+    sender.SetDataToTransmit(pubkey, 32);
+    packageIndex = handshake_send_pubkey();
+    pubkey_msg_seq = 0;
+ } else if (handshake_state == HANDSHAKE_SEND_RSA_PUBKEY) {
+    if (pubkey_msg_seq == 8) { // last pubkey msg 
       handshake_state  = HANDSHAKE_DONE;
+      pubkey_msg_seq = 0;
       return;
     }
-    packageIndex = sender.GetCurrentPayload(data, sizeof(data));
-    sender.ConfirmCurrentPayload(confirmValue);
-    confirmValue = !confirmValue;
+    // send next pubkey package
+    packageIndex = handshake_send_pubkey();
+    if (packageIndex == 0) { // at last package of current msg, prepare next 32 bytes pubkey msg
+      sender.setMaxPackageIndex(ELRS4_TELEMETRY_MAX_PACKAGES);
+      sender.ResetState();
+      sender.SetDataToTransmit(pubkey + (32 * (pubkey_msg_seq + 1)), 32);
+      pubkey_msg_seq++;
+    } 
   }
 
   Radio.TXnb(data, sizeof(data), transmittingRadio);
@@ -155,12 +175,6 @@ void rsa_test()
 void handshake_test()
 {
   //sender.setMaxPackageIndex(ELRS4_TELEMETRY_MAX_PACKAGES);
-  sender.setMaxPackageIndex(255>>1);
-  sender.ResetState();
-  // sender.SetDataToTransmit(pubkey, pubkey_len); // pubkey_len is 256, so max packageIndex is 32, since 256/8 = 32
-  sender.SetDataToTransmit(pubkey, 32);
-  // sender.SetDataToTransmit(batterySequence, sizeof(batterySequence)); // pubkey_len is 256, so max packageIndex is 32, since 256/8 = 32
-
   handshake_state  = HANDSHAKE_HELLO;
   Radio.TXnb((uint8_t*)"hello", 5, transmittingRadio);
 }
@@ -207,7 +221,12 @@ void setup()
   Radio.SetFrequencyHz(2420000000, transmittingRadio);
 
   rsa_test();
-  // lea_test();
+  //lea_test();
+
+  // memset(pubkey, 0, 1024);
+  // for(int i = 0; i < 256; i++)
+  //   pubkey[i] = i;
+
   handshake_test();
 }
 
