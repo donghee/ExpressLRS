@@ -16,13 +16,21 @@ GCM lea_gcm;
 // rsa
 unsigned char pubkey[1024] = {0};
 size_t pubkey_len = 0;
-int packageIndex = 0;
+int pubkey_packageIndex = 0;
 size_t packageSize = 8;
+
+// handshake
+#include <stubborn_sender.h>
+StubbornSender sender;
+uint8_t leakey_packageIndex;
+uint8_t data[8];
+bool confirmValue = true;
 
 enum handshake_state_t {
   HANDSHAKE_INIT,
   HANDSHAKE_WAIT_HELLO,
   HANDSHAKE_WAIT_RSA_PUBKEY,
+  HANDSHAKE_SEND_LEA_KEY,
   HANDSHAKE_DONE
 };
 
@@ -30,35 +38,26 @@ handshake_state_t handshake_state = HANDSHAKE_INIT;
 
 void ICACHE_RAM_ATTR TXdoneCallback()
 {
-    Serial.println("TXdoneCallback1");
+    // Serial.println("TXdoneCallback1");
 }
 
 bool ICACHE_RAM_ATTR RXdoneCallback(SX12xxDriverCommon::rx_status const status)
 {
-    // uint8_t plaintext[DATA_SIZE];
-    // int ret = 0;
-    // ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, 32);
-    //
-    // if (ret == 0)
-    //   digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
-    // delay(100);
-
     if (Radio.RXdataBuffer[0] == 'h' && Radio.RXdataBuffer[1] == 'e' &&
         Radio.RXdataBuffer[2] == 'l' && Radio.RXdataBuffer[3] == 'l' &&
         Radio.RXdataBuffer[4] == 'o' && handshake_state == HANDSHAKE_WAIT_HELLO) {
         digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
         handshake_state = HANDSHAKE_WAIT_RSA_PUBKEY;
-        packageIndex = 0;
+        pubkey_packageIndex = 0;
         pubkey_len = 0;
     } else if (handshake_state == HANDSHAKE_WAIT_RSA_PUBKEY) {
-        if (packageIndex >= 32) {
+        if (pubkey_packageIndex >= 32) { // 256 bytes
             handshake_state = HANDSHAKE_DONE;
-            // __BKPT();
-            // memset(pubkey, 0, sizeof(pubkey));
+            // Radio.TXnb((uint8_t*)"ack", 3, transmittingRadio);
             return true;
         }
-        memcpy(pubkey + (packageIndex * 8), Radio.RXdataBuffer, 8);
-        packageIndex++;
+        memcpy(pubkey + (pubkey_packageIndex * 8), Radio.RXdataBuffer, 8);
+        pubkey_packageIndex++;
         pubkey_len += 8;
     }
 
@@ -103,6 +102,13 @@ void rsa_encrypt_test()
     if( ret != 0 )
         DBGLN("FAILED DECRYPT");
 
+    // hanshake_state = HANDSHAKE_SEND_LEA_KEY;
+    // Radio.TXnb(ciphertext_pub, 128, transmittingRadio); // size of ciphertext_pub is 128 bytes = pubkey_len / 2
+    //
+    // while(HANDSHAKE_DONE != handshake_state) {
+    //     delay(100);
+    // }
+    //
     __BKPT();
 }
 
@@ -130,8 +136,9 @@ void setup()
 void loop()
 {
     if (handshake_state == HANDSHAKE_DONE) {
-        rsa_encrypt_test();
-        handshake_state = HANDSHAKE_WAIT_HELLO;
-        Radio.RXnb();
+
+      rsa_encrypt_test();
+      handshake_state = HANDSHAKE_WAIT_HELLO;
+      Radio.RXnb();
     }
 }

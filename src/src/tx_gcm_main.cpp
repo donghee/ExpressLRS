@@ -15,6 +15,8 @@ GCM lea;
 
 WORD_ALIGNED_ATTR OTA_Packet_s otaPkt = {0};
 
+volatile bool busyTransmitting;
+
 // lea
 uint8_t ciphertext[DATA_SIZE] = { 0 };
 uint8_t testtext[DATA_SIZE] = { 0 };
@@ -27,10 +29,12 @@ int pubkey_msg_num = 0;
 // handshake
 #include <stubborn_sender.h>
 StubbornSender sender;
-uint8_t packageIndex;
+volatile uint8_t packageIndex;
+volatile int pubkey_msg_seq = 0;
 uint8_t data[8];
-bool confirmValue = true;
+volatile bool confirmValue = true;
 uint8_t batterySequence[] = {0xEC,10,0x08,0,0,0,0,0,0,0,1,109};
+uint32_t pubkey_timeout = 10;
 
 // void ICACHE_RAM_ATTR TXdoneCallback()
 // {
@@ -65,14 +69,14 @@ enum handshake_state_t {
   HANDSHAKE_INIT,
   HANDSHAKE_HELLO,
   HANDSHAKE_SEND_RSA_PUBKEY,
+  HANDSHAKE_WAIT_ACK,
   HANDSHAKE_RECV_LEA_KEY,
   HANDSHAKE_DONE
 };
 
 handshake_state_t handshake_state = HANDSHAKE_INIT;
-int pubkey_msg_seq = 0;
 
-uint8_t handshake_send_pubkey()
+uint8_t prepareDateForPubkey()
 {
     uint8_t packageIndex_;
     packageIndex_ = sender.GetCurrentPayload(data, sizeof(data));
@@ -83,33 +87,14 @@ uint8_t handshake_send_pubkey()
 
 void ICACHE_RAM_ATTR TXdoneCallback()
 {
-  digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
-
-  if (handshake_state == HANDSHAKE_HELLO) {
-    // start sending pubkey
-    handshake_state = HANDSHAKE_SEND_RSA_PUBKEY;
-    sender.setMaxPackageIndex(ELRS4_TELEMETRY_MAX_PACKAGES);
-    sender.ResetState();
-    sender.SetDataToTransmit(pubkey, 32);
-    packageIndex = handshake_send_pubkey();
-    pubkey_msg_seq = 0;
- } else if (handshake_state == HANDSHAKE_SEND_RSA_PUBKEY) {
-    if (pubkey_msg_seq == 8) { // last pubkey msg 
-      handshake_state  = HANDSHAKE_DONE;
-      pubkey_msg_seq = 0;
-      return;
-    }
-    // send next pubkey package
-    packageIndex = handshake_send_pubkey();
-    if (packageIndex == 0) { // at last package of current msg, prepare next 32 bytes pubkey msg
-      sender.setMaxPackageIndex(ELRS4_TELEMETRY_MAX_PACKAGES);
-      sender.ResetState();
-      sender.SetDataToTransmit(pubkey + (32 * (pubkey_msg_seq + 1)), 32);
-      pubkey_msg_seq++;
-    } 
+  if (!busyTransmitting)
+  {
+    return; // Already finished transmission 
   }
 
-  Radio.TXnb(data, sizeof(data), transmittingRadio);
+  digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
+
+  busyTransmitting = false;
 }
 
 bool ICACHE_RAM_ATTR RXdoneCallback(SX12xxDriverCommon::rx_status const status)
@@ -122,6 +107,9 @@ bool ICACHE_RAM_ATTR RXdoneCallback(SX12xxDriverCommon::rx_status const status)
   // Serial.println("");
   //
   //Radio.RXnb();
+  
+  __BKPT();
+  busyTransmitting = false;
   return true;
 }
 
@@ -172,11 +160,76 @@ void rsa_test()
     //Radio.TXnb(pubkey, 32, transmittingRadio);
 }
 
-void handshake_test()
+void handshake_hello()
 {
-  //sender.setMaxPackageIndex(ELRS4_TELEMETRY_MAX_PACKAGES);
-  handshake_state  = HANDSHAKE_HELLO;
+  busyTransmitting = true;
   Radio.TXnb((uint8_t*)"hello", 5, transmittingRadio);
+}
+
+int handshake_send_rsa_pubkey()
+{
+ //  if (handshake_state == HANDSHAKE_HELLO) {
+ //    // start sending pubkey
+ //    handshake_state = HANDSHAKE_SEND_RSA_PUBKEY;
+ //    sender.setMaxPackageIndex(ELRS4_TELEMETRY_MAX_PACKAGES);
+ //    sender.ResetState();
+ //    sender.SetDataToTransmit(pubkey, 32);
+ //    packageIndex = handshake_send_pubkey();
+ //    pubkey_msg_seq = 0;
+ // } else if (handshake_state == HANDSHAKE_SEND_RSA_PUBKEY) {
+ //    if (pubkey_msg_seq == 8) { // last pubkey msg
+ //      handshake_state  = HANDSHAKE_DONE;
+ //      pubkey_msg_seq = 0;
+ //      return;
+ //    }
+ //    // send next pubkey package
+ //    packageIndex = handshake_send_pubkey();
+ //    if (packageIndex == 0) { // at last package of current msg, prepare next 32 bytes pubkey msg
+ //      sender.setMaxPackageIndex(ELRS4_TELEMETRY_MAX_PACKAGES);
+ //      sender.ResetState();
+ //      sender.SetDataToTransmit(pubkey + (32 * (pubkey_msg_seq + 1)), 32);
+ //      pubkey_msg_seq++;
+ //    }
+ //  }
+ //
+ //  Radio.TXnb(data, sizeof(data), transmittingRadio);
+
+  busyTransmitting = true;
+
+  if (pubkey_msg_seq == 8) { // last pubkey msg
+      pubkey_msg_seq = 0;
+      return 0; // done sending pubkey
+  }
+
+  packageIndex = prepareDateForPubkey();
+
+  if (packageIndex == 0) { // at last package of current msg, prepare next 32 bytes pubkey msg
+    sender.setMaxPackageIndex(ELRS4_TELEMETRY_MAX_PACKAGES);
+    sender.ResetState();
+    sender.SetDataToTransmit(pubkey + (32 * (pubkey_msg_seq + 1)), 32);
+    pubkey_msg_seq++;
+  }
+
+  Radio.TXnb(data, sizeof(data), transmittingRadio);
+
+  return 1; // continue sending pubkey
+
+  // Radio.TXnb(pubkey + pubkey_msg_num, 32, transmittingRadio);
+  // if (pubkey_msg_num >= 224) {
+  //   pubkey_msg_num = 0;
+  // } else {
+  //   pubkey_msg_num += 32;
+  // }
+}
+
+int handshake_wait_ack(uint32_t timeout)
+{
+  Radio.RXnb();
+
+  pubkey_timeout = millis() + timeout;
+  while ( millis() < pubkey_timeout ) { }
+
+  return -1;
 }
 
 void lea_test()
@@ -227,13 +280,58 @@ void setup()
   // for(int i = 0; i < 256; i++)
   //   pubkey[i] = i;
 
-  handshake_test();
+  handshake_state = HANDSHAKE_INIT;
 }
 
 void loop()
 {
+  int ret = 1;
+
   if (handshake_state == HANDSHAKE_DONE) {
-    handshake_state  = HANDSHAKE_INIT;
-    handshake_test();
+    handshake_state = HANDSHAKE_INIT;
+  }
+
+  if (handshake_state == HANDSHAKE_INIT) {
+    handshake_state = HANDSHAKE_HELLO;
+  }
+
+  if (handshake_state == HANDSHAKE_HELLO) {
+    handshake_hello();
+
+    while (busyTransmitting) { }
+
+    busyTransmitting = true;
+    handshake_state = HANDSHAKE_SEND_RSA_PUBKEY;
+    sender.setMaxPackageIndex(ELRS4_TELEMETRY_MAX_PACKAGES);
+    sender.ResetState();
+    sender.SetDataToTransmit(pubkey, 32);
+    packageIndex = prepareDateForPubkey();
+    pubkey_msg_seq = 0;
+
+    Radio.TXnb(data, sizeof(data), transmittingRadio);
+  }
+  if (handshake_state == HANDSHAKE_SEND_RSA_PUBKEY) {
+    if (!busyTransmitting) {
+      ret = handshake_send_rsa_pubkey();
+    }
+
+    if (ret == 0) {
+      handshake_state = HANDSHAKE_DONE;
+    }
+  }
+  if (handshake_state == HANDSHAKE_WAIT_ACK) {
+    handshake_state = HANDSHAKE_INIT;
+    return;
+
+
+    // wait ack
+    // handshake_state = HANDSHAKE_INIT;
+    // ret = handshake_wait_ack(10); // 10ms timeout
+    // return;
+    if (ret == 0) { // got ack
+      handshake_state = HANDSHAKE_RECV_LEA_KEY;
+    } else { // restart handshake
+      handshake_state = HANDSHAKE_INIT;
+    }
   }
 }
