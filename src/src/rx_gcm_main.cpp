@@ -41,7 +41,6 @@ enum handshake_state_t {
 handshake_state_t handshake_state = HANDSHAKE_INIT;
 
 volatile bool busyTransmitting;
-volatile bool busyReceiving;
 
 uint8_t prepareDateForLeakey()
 {
@@ -54,21 +53,17 @@ uint8_t prepareDateForLeakey()
 
 void ICACHE_RAM_ATTR TXdoneCallback()
 {
-    // Serial.println("TXdoneCallback1");
   busyTransmitting = false;
 }
 
 bool ICACHE_RAM_ATTR RXdoneCallback(SX12xxDriverCommon::rx_status const status)
 {
-    if (Radio.RXdataBuffer[0] == 'h' && Radio.RXdataBuffer[1] == 'e' &&
-        Radio.RXdataBuffer[2] == 'l' && Radio.RXdataBuffer[3] == 'l' &&
-        Radio.RXdataBuffer[4] == 'o' && handshake_state == HANDSHAKE_WAIT_HELLO) {
+    if (memcmp(Radio.RXdataBuffer, "hello", 5) == 0 && handshake_state == HANDSHAKE_WAIT_HELLO) {
         handshake_state = HANDSHAKE_WAIT_RSA_PUBKEY;
         pubkey_packageIndex = 0;
         pubkey_len = 0;
     } else if (handshake_state == HANDSHAKE_WAIT_RSA_PUBKEY) {
         if (pubkey_packageIndex >= 32) { // 256 bytes
-          digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
           handshake_state = HANDSHAKE_GOT_RSA_PUBKEY;
           return true;
         }
@@ -142,10 +137,17 @@ void setup()
     Radio.RXnb();
 }
 
-int ack_counter = 0;
+int ack = 0;
+
 void loop()
 {
   int ret = 1;
+
+  if (handshake_state == HANDSHAKE_INIT) {
+    handshake_state = HANDSHAKE_WAIT_HELLO;
+    Radio.RXnb();
+  }
+
   if (handshake_state == HANDSHAKE_GOT_RSA_PUBKEY) {
     rsa_encrypt_test();
     //TODO: if encrypt success, send ack otherwise send nack
@@ -157,45 +159,30 @@ void loop()
       busyTransmitting = true;
       Radio.TXnb((uint8_t*)"ack", 3, transmittingRadio);
     }
-
     while (busyTransmitting) { }
 
-    ack_counter++;
-
-    if (ack_counter == 10) {
-      for (int i = 0; i < 128; i=i+8) {
-        busyTransmitting = true;
-        Radio.TXnb(ciphertext_pub+i, 8, transmittingRadio);
-        while (busyTransmitting) { }
-      }
-
-      ack_counter = 0;
-      handshake_state = HANDSHAKE_WAIT_HELLO;
-      Radio.RXnb();
+    ack++;
+    if (ack == 20) { // 20 or 5
+      ack = 0;
+      handshake_state = HANDSHAKE_SEND_LEA_KEY;
     }
-
-    // handshake_state = HANDSHAKE_WAIT_HELLO;
-    // Radio.RXnb();
   }
 
   if (handshake_state == HANDSHAKE_SEND_LEA_KEY) {
     // send lea key
+    for (int i = 0; i < 128; i=i+8) {
+      busyTransmitting = true;
+      Radio.TXnb(ciphertext_pub+i, 8, transmittingRadio);
+      while (busyTransmitting) { }
+    }
+
     handshake_state = HANDSHAKE_DONE;
   }
 
   if (handshake_state == HANDSHAKE_DONE) {
-    // digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
-    // delay(500);
-    // digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
-    // delay(500);
+    digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
 
-    // digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
-    // delay(500);
-    // digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
-    // delay(500);
-
-    handshake_state = HANDSHAKE_WAIT_HELLO;
-    Radio.RXnb();
+    while (busyTransmitting) { }
+    handshake_state = HANDSHAKE_INIT;
   }
-
 }
