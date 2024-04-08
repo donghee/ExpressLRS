@@ -16,10 +16,14 @@ GCM lea;
 WORD_ALIGNED_ATTR OTA_Packet_s otaPkt = {0};
 
 volatile bool busyTransmitting;
+volatile bool busyReceiving;
 
 // lea
 uint8_t ciphertext[DATA_SIZE] = { 0 };
 uint8_t testtext[DATA_SIZE] = { 0 };
+unsigned char lea_key[512] = {0};
+size_t lea_key_len = 0;
+int lea_key_packageIndex = 0;
 
 // rsa
 unsigned char pubkey[1024] = {0};
@@ -35,6 +39,7 @@ uint8_t data[8];
 volatile bool confirmValue = true;
 uint8_t batterySequence[] = {0xEC,10,0x08,0,0,0,0,0,0,0,1,109};
 uint32_t pubkey_timeout = 10;
+uint32_t lea_key_timeout = 10;
 
 // void ICACHE_RAM_ATTR TXdoneCallback()
 // {
@@ -89,27 +94,34 @@ void ICACHE_RAM_ATTR TXdoneCallback()
 {
   if (!busyTransmitting)
   {
-    return; // Already finished transmission 
+    return; // Already finished transmission
   }
-
-  digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
 
   busyTransmitting = false;
 }
 
 bool ICACHE_RAM_ATTR RXdoneCallback(SX12xxDriverCommon::rx_status const status)
 {
-  // for (int i = 0; i < 8; i++)
-  // {
-  //   Serial.print(Radio.RXdataBuffer[i], HEX);
-  //   Serial.print(",");
-  // }
-  // Serial.println("");
-  //
-  //Radio.RXnb();
-  
-  __BKPT();
-  busyTransmitting = false;
+  if (Radio.RXdataBuffer[0] == 'a' && Radio.RXdataBuffer[1] == 'c' &&
+      Radio.RXdataBuffer[2] == 'k') {
+    handshake_state = HANDSHAKE_RECV_LEA_KEY;
+    lea_key_packageIndex = 0;
+    lea_key_len = 0;
+  } else if (handshake_state == HANDSHAKE_RECV_LEA_KEY) {
+    if (lea_key_packageIndex >= 15) {
+      digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
+      memcpy(lea_key + (lea_key_packageIndex * 8), Radio.RXdataBuffer, 8);
+      handshake_state = HANDSHAKE_DONE;
+      return true;
+    }
+
+    memcpy(lea_key + (lea_key_packageIndex * 8), Radio.RXdataBuffer, 8);
+    lea_key_packageIndex++;
+    lea_key_len += 8;
+  }
+
+  busyReceiving = false;
+  Radio.RXnb();
   return true;
 }
 
@@ -222,14 +234,13 @@ int handshake_send_rsa_pubkey()
   // }
 }
 
-int handshake_wait_ack(uint32_t timeout)
+void handshake_wait_ack()
 {
   Radio.RXnb();
+}
 
-  pubkey_timeout = millis() + timeout;
-  while ( millis() < pubkey_timeout ) { }
-
-  return -1;
+void handshake_recv_lea_key()
+{
 }
 
 void lea_test()
@@ -245,16 +256,12 @@ void lea_test()
   otaPkt.std.rc.ch4 = 0;
   otaPkt.std.crcLow = 7;
 
-  // Radio.RXnb();
-  // OTA_Packet_s * const otaPktPtr = (OTA_Packet_s * const)plaintext;
-
   if (lea.encrypt(&otaPkt, ciphertext, 32) != 0) {
     DBGLN("LEA GCM encrypt error");
     return;
   }
 
   Radio.TXnb(ciphertext, sizeof(ciphertext), transmittingRadio);
-  //Radio.TXnb(testdata, sizeof(testdata), transmittingRadio);
 }
 
 void setup()
@@ -288,6 +295,16 @@ void loop()
   int ret = 1;
 
   if (handshake_state == HANDSHAKE_DONE) {
+    // digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
+    // delay(500);
+    // digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
+    // delay(500);
+
+    // digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
+    // delay(500);
+    // digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
+    // delay(500);
+
     handshake_state = HANDSHAKE_INIT;
   }
 
@@ -305,33 +322,30 @@ void loop()
     sender.setMaxPackageIndex(ELRS4_TELEMETRY_MAX_PACKAGES);
     sender.ResetState();
     sender.SetDataToTransmit(pubkey, 32);
-    packageIndex = prepareDateForPubkey();
+    packageIndex = prepareDateForPubkey(); // TODO, add data reference
     pubkey_msg_seq = 0;
 
     Radio.TXnb(data, sizeof(data), transmittingRadio);
   }
+
   if (handshake_state == HANDSHAKE_SEND_RSA_PUBKEY) {
     if (!busyTransmitting) {
       ret = handshake_send_rsa_pubkey();
     }
 
     if (ret == 0) {
-      handshake_state = HANDSHAKE_DONE;
+      handshake_state = HANDSHAKE_WAIT_ACK;
+      Radio.RXnb();
+      pubkey_timeout = millis() + 10;
     }
   }
+
   if (handshake_state == HANDSHAKE_WAIT_ACK) {
-    handshake_state = HANDSHAKE_INIT;
-    return;
-
-
-    // wait ack
-    // handshake_state = HANDSHAKE_INIT;
-    // ret = handshake_wait_ack(10); // 10ms timeout
-    // return;
-    if (ret == 0) { // got ack
-      handshake_state = HANDSHAKE_RECV_LEA_KEY;
-    } else { // restart handshake
+    if ( millis() > pubkey_timeout ) {  // on timeout, restart handshake
       handshake_state = HANDSHAKE_INIT;
     }
+  }
+
+  if (handshake_state == HANDSHAKE_RECV_LEA_KEY) {
   }
 }
