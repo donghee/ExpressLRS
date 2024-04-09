@@ -93,11 +93,6 @@ uint8_t prepareDateForPubkey()
 
 void ICACHE_RAM_ATTR TXdoneCallback()
 {
-  if (!busyTransmitting)
-  {
-    return; // Already finished transmission
-  }
-
   busyTransmitting = false;
 }
 
@@ -123,13 +118,26 @@ bool ICACHE_RAM_ATTR RXdoneCallback(SX12xxDriverCommon::rx_status const status)
   return true;
 }
 
+void rsa_generate_pubkey(unsigned char * pubkey, size_t * pubkey_len)
+{
+    int ret = 1;
+    const char *pers = "rsa_genkey";
+
+    // generate public key
+    ret = rsa.generate_key(pers, strlen(pers));
+    if ( ret != 0 )
+        DBGLN("FAILED GENERATE KEY");
+    ret = rsa.export_pubkey(pubkey, pubkey_len);
+    if ( ret != 0 )
+        DBGLN("FAILED EXPORT PUBKEY");
+}
+
 void rsa_test()
 {
     int ret = 1;
     const char *pers = "rsa_genkey";
 
     // generate public key
-
     ret = rsa.generate_key(pers, strlen(pers));
     if ( ret != 0 )
         DBGLN("FAILED GENERATE KEY");
@@ -142,7 +150,7 @@ void rsa_test()
     unsigned char ciphertext_pub[512] = {0};
     plaintext_pub[0] = 0x04; plaintext_pub[1] = 0x03; plaintext_pub[2] = 0x02;
     plaintext_pub[3] = 0x01; plaintext_pub[4] = 0x00;
-    ret = rsa.encrypt(pubkey, pubkey_len, plaintext_pub, ciphertext_pub, 5);
+    ret = rsa.encrypt(pubkey, pubkey_len, plaintext_pub, 5, ciphertext_pub);
     if( ret != 0 )
         DBGLN("FAILED ENCRYPT");
 
@@ -150,8 +158,8 @@ void rsa_test()
     unsigned char plaintext[1024] = {0};
     unsigned char ciphertext[512] = {0};
     plaintext[0] = 0x00; plaintext[1] = 0x01; plaintext[2] = 0x02;
-    plaintext[3] = 0x03; plaintext[4] = 0x04;
-    ret = rsa.encrypt(plaintext, ciphertext, 5);
+    plaintext[2] = 0x03; plaintext[4] = 0x04;
+    ret = rsa.encrypt(plaintext, 5, ciphertext);
     if( ret != 0 )
         DBGLN("FAILED ENCRYPT");
 
@@ -178,32 +186,6 @@ void handshake_hello()
 
 int handshake_send_rsa_pubkey()
 {
- //  if (handshake_state == HANDSHAKE_HELLO) {
- //    // start sending pubkey
- //    handshake_state = HANDSHAKE_SEND_RSA_PUBKEY;
- //    sender.setMaxPackageIndex(ELRS4_TELEMETRY_MAX_PACKAGES);
- //    sender.ResetState();
- //    sender.SetDataToTransmit(pubkey, 32);
- //    packageIndex = handshake_send_pubkey();
- //    pubkey_msg_seq = 0;
- // } else if (handshake_state == HANDSHAKE_SEND_RSA_PUBKEY) {
- //    if (pubkey_msg_seq == 8) { // last pubkey msg
- //      handshake_state  = HANDSHAKE_DONE;
- //      pubkey_msg_seq = 0;
- //      return;
- //    }
- //    // send next pubkey package
- //    packageIndex = handshake_send_pubkey();
- //    if (packageIndex == 0) { // at last package of current msg, prepare next 32 bytes pubkey msg
- //      sender.setMaxPackageIndex(ELRS4_TELEMETRY_MAX_PACKAGES);
- //      sender.ResetState();
- //      sender.SetDataToTransmit(pubkey + (32 * (pubkey_msg_seq + 1)), 32);
- //      pubkey_msg_seq++;
- //    }
- //  }
- //
- //  Radio.TXnb(data, sizeof(data), transmittingRadio);
-
   busyTransmitting = true;
 
   if (pubkey_msg_seq == 8) { // last pubkey msg
@@ -271,7 +253,8 @@ void setup()
   Radio.RXdoneCallback = &RXdoneCallback;
   Radio.SetFrequencyHz(2420000000, transmittingRadio);
 
-  rsa_test();
+  rsa_generate_pubkey(pubkey, &pubkey_len);
+  //rsa_test();
   //lea_test();
 
   // memset(pubkey, 0, 1024);
