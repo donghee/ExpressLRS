@@ -133,56 +133,55 @@ void setup()
     Radio.RXdoneCallback = &RXdoneCallback;
     Radio.SetFrequencyHz(2420000000, transmittingRadio);
 
-    handshake_state = HANDSHAKE_WAIT_HELLO;
-    Radio.RXnb();
+    handshake_state = HANDSHAKE_INIT;
 }
 
 int ack = 0;
 
 void loop()
 {
-  int ret = 1;
+  switch (handshake_state) {
+    case HANDSHAKE_INIT:
+      delay(500);
+      handshake_state = HANDSHAKE_WAIT_HELLO;
+      Radio.RXnb();
+      break;
 
-  if (handshake_state == HANDSHAKE_INIT) {
-    handshake_state = HANDSHAKE_WAIT_HELLO;
-    Radio.RXnb();
-  }
+    case HANDSHAKE_WAIT_HELLO:
+      break;
 
-  if (handshake_state == HANDSHAKE_GOT_RSA_PUBKEY) {
-    rsa_encrypt_test();
-    //TODO: if encrypt success, send ack otherwise send nack
-    handshake_state = HANDSHAKE_SEND_ACK;
-  }
+    case HANDSHAKE_GOT_RSA_PUBKEY:
+      rsa_encrypt_test();
+      //TODO: if encrypt success, send ack otherwise send nack
+      handshake_state = HANDSHAKE_SEND_ACK;
+      break;
 
-  if (handshake_state == HANDSHAKE_SEND_ACK) {
-    if (!busyTransmitting) {
-      busyTransmitting = true;
-      Radio.TXnb((uint8_t*)"ack", 3, transmittingRadio);
-    }
-    while (busyTransmitting) { }
-
-    ack++;
-    if (ack == 20) { // 20 or 5
-      ack = 0;
-      handshake_state = HANDSHAKE_SEND_LEA_KEY;
-    }
-  }
-
-  if (handshake_state == HANDSHAKE_SEND_LEA_KEY) {
-    // send lea key
-    for (int i = 0; i < 128; i=i+8) {
-      busyTransmitting = true;
-      Radio.TXnb(ciphertext_pub+i, 8, transmittingRadio);
+    case HANDSHAKE_SEND_ACK:
+      if (!busyTransmitting) {
+        busyTransmitting = true;
+        Radio.TXnb((uint8_t*)"ack", 3, transmittingRadio);
+      }
       while (busyTransmitting) { }
-    }
+      delayMicroseconds(100);
+      ack++;
+      if (ack == 20) { // ack 20번 보내면, TX에서 LEA키 받고, 5번 보내면, TX에 LEA키 이상한 값이 나옴
+        ack = 0;
+        handshake_state = HANDSHAKE_SEND_LEA_KEY;
+      }
+      break;
 
-    handshake_state = HANDSHAKE_DONE;
-  }
+    case HANDSHAKE_SEND_LEA_KEY:
+      for (int i = 0; i < 128; i=i+8) {
+        busyTransmitting = true;
+        Radio.TXnb(ciphertext_pub+i, 8, transmittingRadio);
+        while (busyTransmitting) { }
+      }
+      handshake_state = HANDSHAKE_DONE;
+      break;
 
-  if (handshake_state == HANDSHAKE_DONE) {
-    digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
-
-    while (busyTransmitting) { }
-    handshake_state = HANDSHAKE_INIT;
+    case HANDSHAKE_DONE:
+      digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
+      handshake_state = HANDSHAKE_INIT;
+      break;
   }
 }

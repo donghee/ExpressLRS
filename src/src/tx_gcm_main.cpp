@@ -289,59 +289,62 @@ void loop()
   unsigned char decryptedtext[1024] = {0};
   size_t i;
 
-  if (handshake_state == HANDSHAKE_DECRYPT_LEA_KEY) {
-    ret = rsa.decrypt(lea_key, decryptedtext, &i, 1024);
-    if (ret != 0)
-      DBGLN("FAILED DECRYPT");
+  switch (handshake_state) {
+    case HANDSHAKE_INIT:
+      handshake_state = HANDSHAKE_HELLO;
+      break;
 
-    if (ret == 0)
-      handshake_state = HANDSHAKE_DONE;
-    else
+    case HANDSHAKE_HELLO:
+      handshake_hello();
+
+      while (busyTransmitting) { }
+
+      busyTransmitting = true;
+      handshake_state = HANDSHAKE_SEND_RSA_PUBKEY;
+      sender.setMaxPackageIndex(ELRS4_TELEMETRY_MAX_PACKAGES);
+      sender.ResetState();
+      sender.SetDataToTransmit(pubkey, 32);
+      packageIndex = prepareDateForPubkey(); // TODO, add data reference
+      pubkey_msg_seq = 0;
+
+      Radio.TXnb(data, sizeof(data), transmittingRadio);
+      break;
+
+    case HANDSHAKE_SEND_RSA_PUBKEY:
+      if (!busyTransmitting) {
+        ret = handshake_send_rsa_pubkey();
+      }
+      if (ret == 0) {
+        pubkey_timeout = millis() + 10;
+        handshake_state = HANDSHAKE_WAIT_ACK;
+        Radio.RXnb();
+      }
+      break;
+
+    case HANDSHAKE_WAIT_ACK:
+      if (millis() > pubkey_timeout) {  // on timeout, restart handshake
+        handshake_state = HANDSHAKE_INIT;
+      }
+      break;
+
+    case HANDSHAKE_RECV_LEA_KEY:
+      // No operation defined for this case
+      break;
+
+    case HANDSHAKE_DECRYPT_LEA_KEY:
+      ret = rsa.decrypt(lea_key, decryptedtext, &i, 1024);
+      if (ret != 0)
+        DBGLN("FAILED DECRYPT");
+
+      if (ret == 0)
+        handshake_state = HANDSHAKE_DONE;
+      else
+        handshake_state = HANDSHAKE_INIT;
+      break;
+
+    case HANDSHAKE_DONE:
+      digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
       handshake_state = HANDSHAKE_INIT;
-  }
-
-  if (handshake_state == HANDSHAKE_DONE) {
-    digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
-    handshake_state = HANDSHAKE_INIT;
-  }
-
-  if (handshake_state == HANDSHAKE_INIT) {
-    handshake_state = HANDSHAKE_HELLO;
-  }
-
-  if (handshake_state == HANDSHAKE_HELLO) {
-    handshake_hello();
-
-    while (busyTransmitting) { }
-
-    busyTransmitting = true;
-    handshake_state = HANDSHAKE_SEND_RSA_PUBKEY;
-    sender.setMaxPackageIndex(ELRS4_TELEMETRY_MAX_PACKAGES);
-    sender.ResetState();
-    sender.SetDataToTransmit(pubkey, 32);
-    packageIndex = prepareDateForPubkey(); // TODO, add data reference
-    pubkey_msg_seq = 0;
-
-    Radio.TXnb(data, sizeof(data), transmittingRadio);
-  }
-
-  if (handshake_state == HANDSHAKE_SEND_RSA_PUBKEY) {
-    if (!busyTransmitting) {
-      ret = handshake_send_rsa_pubkey();
-    }
-    if (ret == 0) {
-      pubkey_timeout = millis() + 10;
-      handshake_state = HANDSHAKE_WAIT_ACK;
-      Radio.RXnb();
-    }
-  }
-
-  if (handshake_state == HANDSHAKE_WAIT_ACK) {
-    if (millis() > pubkey_timeout) {  // on timeout, restart handshake
-      handshake_state = HANDSHAKE_INIT;
-    }
-  }
-
-  if (handshake_state == HANDSHAKE_RECV_LEA_KEY) {
+      break;
   }
 }
