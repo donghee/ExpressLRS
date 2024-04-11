@@ -64,7 +64,7 @@ int RSA::export_pubkey(unsigned char *pubkey, size_t *pubkey_len)
 }
 
 
-int RSA::encrypt(const unsigned char *input, unsigned char *output, size_t len)
+int RSA::encrypt(const unsigned char *input, size_t len, unsigned char *output)
 {
     int ret = 1;
     int exit_code = MBEDTLS_EXIT_FAILURE;
@@ -81,7 +81,7 @@ int RSA::encrypt(const unsigned char *input, unsigned char *output, size_t len)
     return ret;
 }
 
-int RSA::encrypt(const unsigned char *pubkey, size_t pubkey_len, const unsigned char *input, unsigned char *output, size_t len)
+int RSA::encrypt(const unsigned char *pubkey, size_t pubkey_len, const unsigned char *input, size_t len, unsigned char *output)
 {
     int ret = 1;
     int exit_code = MBEDTLS_EXIT_FAILURE;
