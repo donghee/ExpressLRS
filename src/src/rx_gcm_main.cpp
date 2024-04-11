@@ -5,122 +5,31 @@
 #include "FHSS.h"
 #include "gcm.h"
 #include "rsa.h"
+#include "rx_handshake.h"
 
 #define assert(c) if (!(c)) __BKPT()
-
 #define DATA_SIZE 32
 
 SX12XX_Radio_Number_t transmittingRadio = Radio.GetLastSuccessfulPacketRadio();
 GCM lea_gcm;
-
-// rsa
-unsigned char pubkey[1024] = {0};
-size_t pubkey_len = 0;
-int pubkey_packageIndex = 0;
-size_t packageSize = 8;
-
-// handshake
-#include <stubborn_sender.h>
-StubbornSender sender;
-volatile uint8_t packageIndex;
-volatile int lea_key_msg_seq = 0;
-uint8_t data[8];
-volatile bool confirmValue = true;
-uint32_t ack_timeout = 10;
-
-enum handshake_state_t {
-  HANDSHAKE_INIT,
-  HANDSHAKE_WAIT_HELLO,
-  HANDSHAKE_WAIT_RSA_PUBKEY,
-  HANDSHAKE_GOT_RSA_PUBKEY,
-  HANDSHAKE_SEND_ACK,
-  HANDSHAKE_SEND_LEA_KEY,
-  HANDSHAKE_DONE
-};
-
-handshake_state_t handshake_state = HANDSHAKE_INIT;
-
-volatile bool busyTransmitting;
-
-uint8_t prepareDateForLeakey()
-{
-    uint8_t packageIndex_;
-    packageIndex_ = sender.GetCurrentPayload(data, sizeof(data));
-    sender.ConfirmCurrentPayload(confirmValue);
-    confirmValue = !confirmValue;
-    return packageIndex_;
-}
+RxHandshakeClass RxHandshake;
 
 void ICACHE_RAM_ATTR TXdoneCallback()
 {
-  busyTransmitting = false;
-}
-
-void handle_recv_hello() {
-    if (memcmp(Radio.RXdataBuffer, "hello", 5) == 0) {
-        handshake_state = HANDSHAKE_WAIT_RSA_PUBKEY;
-        pubkey_packageIndex = 0;
-        pubkey_len = 0;
-    } 
-
-    Radio.RXnb();
-}
-
-void handle_recv_rsa_pub_key() {
-    if (pubkey_packageIndex >= 32) { // 256 bytes
-      handshake_state = HANDSHAKE_GOT_RSA_PUBKEY;
-      return;
-    }
-    memcpy(pubkey + (pubkey_packageIndex * 8), Radio.RXdataBuffer, 8);
-    pubkey_packageIndex++;
-    pubkey_len += 8;
-
-    Radio.RXnb();
+  RxHandshake.busy(false);
 }
 
 bool ICACHE_RAM_ATTR RXdoneCallback(SX12xxDriverCommon::rx_status const status)
 {
-  if (handshake_state == HANDSHAKE_WAIT_HELLO) {
-    handle_recv_hello();
+  if (RxHandshake.state() == HANDSHAKE_WAIT_HELLO) {
+    RxHandshake.handle_wait_hello();
     return true;
   }
 
-  if (handshake_state == HANDSHAKE_WAIT_RSA_PUBKEY) {
-    handle_recv_rsa_pub_key();
+  if (RxHandshake.state() == HANDSHAKE_WAIT_RSA_PUB_KEY) {
+    RxHandshake.handle_recv_rsa_pub_key();
     return true;
   }
-}
-
-unsigned char ciphertext_pub[512] = {0};
-
-void rsa_encrypt(unsigned char *pubkey, size_t pubkey_len, unsigned char *plaintext, size_t plaintext_len, 
-                 unsigned char *ciphertext, size_t ciphertext_len)
-{
-    int ret = 1;
-    const char *pers = "rsa_genkey";
-
-    RSA rsa;
-    // generate key for test
-    ret = rsa.generate_key(pers, strlen(pers));
-    if ( ret != 0 ) { 
-        DBGLN("FAILED GENERATE KEY");
-        __BKPT();
-        return;
-    }
-
-    // encrypt using generated public key
-    ret = rsa.encrypt(pubkey, pubkey_len, plaintext, plaintext_len, ciphertext);
-    if ( ret != 0 ) {
-        __BKPT();
-        return;
-    }
-
-    // decrypt for test
-    // unsigned char decryptedtext[1024] = {0};
-    // size_t i;
-    // ret = rsa.decrypt(ciphertext, decryptedtext, &i, 1024);
-    // if( ret != 0 )
-    //     DBGLN("FAILED DECRYPT");
 }
 
 void setup()
@@ -142,67 +51,10 @@ void setup()
 
     delay(5000);
 
-    handshake_state = HANDSHAKE_INIT;
+    RxHandshake.init();
 }
-
-int ack = 0;
-
-// LEA key
-unsigned char plaintext[1024] = {0};
-// generate plaintext for test
-uint8_t K[16] = {0x14, 0x87, 0x0B, 0x99, 0x92, 0xEA, 0x89, 0x67, 0x8A, 0x1D, 0xDF, 0xD6, 0x30, 0x91, 0x8D, 0xF0};
-uint8_t A[16] = {0};
-uint8_t N[12] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B};
-
 
 void loop()
 {
-  switch (handshake_state) {
-    case HANDSHAKE_INIT:
-      delay(500);
-      handshake_state = HANDSHAKE_WAIT_HELLO;
-      Radio.RXnb();
-      break;
-
-    case HANDSHAKE_WAIT_HELLO:
-      break;
-
-    case HANDSHAKE_GOT_RSA_PUBKEY:
-      // encrypt LEA key using RSA public key
-      memcpy(plaintext, K, 16);
-      memcpy(plaintext + 16, A, 16);
-      memcpy(plaintext + 32, N, 12);
-      rsa_encrypt(pubkey, pubkey_len, plaintext, 16+16+12, ciphertext_pub, 512);
-      //TODO: if encrypt success, send ack otherwise send nack
-      handshake_state = HANDSHAKE_SEND_ACK;
-      break;
-
-    case HANDSHAKE_SEND_ACK:
-      if (!busyTransmitting) {
-        busyTransmitting = true;
-        Radio.TXnb((uint8_t*)"ack", 3, transmittingRadio);
-      }
-      while (busyTransmitting) { }
-      delayMicroseconds(100);
-      ack++;
-      if (ack == 20) { // ack 20번 보내면, TX에서 LEA키 받고, 5번 보내면, TX에 LEA키 이상한 값이 나옴
-        ack = 0;
-        handshake_state = HANDSHAKE_SEND_LEA_KEY;
-      }
-      break;
-
-    case HANDSHAKE_SEND_LEA_KEY:
-      for (int i = 0; i < 128; i=i+8) {
-        busyTransmitting = true;
-        Radio.TXnb(ciphertext_pub+i, 8, transmittingRadio);
-        while (busyTransmitting) { }
-      }
-      handshake_state = HANDSHAKE_DONE;
-      break;
-
-    case HANDSHAKE_DONE:
-      digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
-      handshake_state = HANDSHAKE_INIT;
-      break;
-  }
+  RxHandshake.do_handle();
 }
