@@ -125,8 +125,15 @@ void setup()
   TxHandshake.init();
 }
 
+uint8_t K[16] = {0};  uint8_t A[16] = {0};  uint8_t N[12] = {0};
+size_t K_len, A_len, N_len;
+
 void loop()
 {
-  // if (!TxHandshake.done())
-  TxHandshake.do_handle();
+  if (!TxHandshake.done()) {
+    TxHandshake.do_handle();
+  } else {
+    TxHandshake.get_lea_key(K, K_len, A, A_len, N, N_len);
+    __BKPT();
+  }
 }

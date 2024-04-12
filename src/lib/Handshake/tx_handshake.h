@@ -92,7 +92,7 @@ class TxHandshakeClass {
           DBGLN("FAILED DECRYPT");
 
         if (ret == 0) {
-          memcpy(K, decryptedtext, 16); memcpy(A, decryptedtext + 16, 16); memcpy(N, decryptedtext + 32, 12);
+          // memcpy(K_, decryptedtext, 16); memcpy(A_, decryptedtext + 16, 16); memcpy(N_, decryptedtext + 32, 12);
           tx_handshake_state = HANDSHAKE_DONE;
         } else {
           tx_handshake_state = HANDSHAKE_INIT;
@@ -185,6 +185,16 @@ class TxHandshakeClass {
     }
   };
 
+  int get_lea_key(uint8_t* K, size_t& K_len, uint8_t* A, size_t& A_len, uint8_t* N, size_t& N_len )
+  {
+    if (state() != HANDSHAKE_DONE)
+      return -1;
+    memcpy(K, decryptedtext, 16); memcpy(A, decryptedtext + 16, 16); memcpy(N, decryptedtext + 32, 12);
+    K_len = 16; A_len = 16; N_len = 12;
+
+    return 0;
+  }
+
  private:
   void generate_pub_key()
   {
@@ -210,9 +220,9 @@ class TxHandshakeClass {
 
   // decrypt lea key
   unsigned char decryptedtext[1024] = {0};
-  uint8_t K[16] = {0};
-  uint8_t A[16] = {0};
-  uint8_t N[12] = {0};
+  // uint8_t K_[16] = {0};
+  // uint8_t A_[16] = {0};
+  // uint8_t N_[12] = {0};
 
   // rsa
   unsigned char pub_key[1024] = {0};
