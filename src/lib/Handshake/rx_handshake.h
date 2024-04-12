@@ -30,11 +30,14 @@ class RxHandshakeClass {
   }
 
   rx_handshake_state_t state() { return rx_handshake_state; };
+  inline bool done() { return rx_handshake_state == HANDSHAKE_DONE; };
 
-  bool busy() { return busyTransmitting; };
-  void busy(bool busyTransmitting_) { busyTransmitting = busyTransmitting_; };
+  inline bool busy() { return busyTransmitting; };
+  inline void busy(bool busyTransmitting_) { busyTransmitting = busyTransmitting_; };
 
   void do_handle() {
+    int ret = 1;
+
     switch (rx_handshake_state) {
       case HANDSHAKE_INIT:
         delay(500);
@@ -47,20 +50,18 @@ class RxHandshakeClass {
 
       case HANDSHAKE_GOT_RSA_PUB_KEY:
         // encrypt LEA key using RSA public key
-        memcpy(plaintext, K, 16);
-        memcpy(plaintext + 16, A, 16);
-        memcpy(plaintext + 32, N, 12);
-        encrypt(pub_key, pub_key_len, plaintext, 16+16+12, ciphertext_pub, 512);
+        memcpy(plaintext, K, 16); memcpy(plaintext + 16, A, 16); memcpy(plaintext + 32, N, 12);
+        encrypt(pub_key, pub_key_len, plaintext, 16 + 16 + 12, ciphertext_pub, 512);
         //TODO: if encrypt success, send ack otherwise send nack
         rx_handshake_state = HANDSHAKE_SEND_ACK;
         break;
 
       case HANDSHAKE_SEND_ACK:
-        if (!busyTransmitting) {
-          busyTransmitting = true;
+        if (!busy()) {
+          busy(true);
           Radio.TXnb((uint8_t*)"ack", 3, transmittingRadio);
         }
-        while (busyTransmitting) { }
+        while (busy()) { }
         delayMicroseconds(100);
         ack++;
         if (ack == 20) { // ack 20번 보내면, TX에서 LEA키 받고, 5번 보내면, TX에 LEA키 이상한 값이 나옴
@@ -70,10 +71,10 @@ class RxHandshakeClass {
         break;
 
       case HANDSHAKE_SEND_LEA_KEY:
-        for (int i = 0; i < 128; i=i+8) {
-          busyTransmitting = true;
-          Radio.TXnb(ciphertext_pub+i, 8, transmittingRadio);
-          while (busyTransmitting) { }
+        for (int i = 0; i < 128; i = i + 8) {
+          busy(true);
+          Radio.TXnb(ciphertext_pub + i, 8, transmittingRadio);
+          while (busy()) { }
         }
         rx_handshake_state = HANDSHAKE_DONE;
         break;
@@ -82,6 +83,49 @@ class RxHandshakeClass {
         digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
         rx_handshake_state = HANDSHAKE_INIT;
         break;
+    }
+  };
+
+  void TXdoneCallback() {
+    busy(false);
+  };
+
+
+  bool RXdoneCallback(SX12xxDriverCommon::rx_status const status)
+  {
+    if (state() == HANDSHAKE_WAIT_HELLO) {
+      handle_wait_hello();
+      return true;
+    }
+
+    if (state() == HANDSHAKE_WAIT_RSA_PUB_KEY) {
+      handle_recv_rsa_pub_key();
+      return true;
+    }
+  };
+
+ private:
+  void encrypt(unsigned char *pub_key, size_t pub_key_len,
+                      unsigned char *plaintext, size_t plaintext_len,
+                      unsigned char *ciphertext, size_t ciphertext_len)
+  {
+    int ret = 1;
+    const char *pers = "rsa_genkey";
+
+    RSA rsa;
+    // generate key for test
+    ret = rsa.generate_key(pers, strlen(pers));
+    if ( ret != 0 ) {
+       DBGLN("FAILED GENERATE KEY");
+       __BKPT();
+       return;
+    }
+
+    // encrypt using generated public key
+    ret = rsa.encrypt(pub_key, pub_key_len, plaintext, plaintext_len, ciphertext);
+    if ( ret != 0 ) {
+        __BKPT();
+        return;
     }
   };
 
@@ -107,36 +151,6 @@ class RxHandshakeClass {
     Radio.RXnb();
   };
 
-  void TXdoneCallback() {
-    busyTransmitting = false;
-  };
-
-
-  void encrypt(unsigned char *pub_key, size_t pub_key_len,
-                      unsigned char *plaintext, size_t plaintext_len,
-                      unsigned char *ciphertext, size_t ciphertext_len)
-  {
-    int ret = 1;
-    const char *pers = "rsa_genkey";
-
-    RSA rsa;
-    // generate key for test
-    ret = rsa.generate_key(pers, strlen(pers));
-    if ( ret != 0 ) {
-       DBGLN("FAILED GENERATE KEY");
-       __BKPT();
-       return;
-    }
-
-    // encrypt using generated public key
-    ret = rsa.encrypt(pub_key, pub_key_len, plaintext, plaintext_len, ciphertext);
-    if ( ret != 0 ) {
-        __BKPT();
-        return;
-    }
-  };
-
- private:
   rx_handshake_state_t rx_handshake_state;
   bool busyTransmitting;
 

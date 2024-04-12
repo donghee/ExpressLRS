@@ -18,21 +18,15 @@ WORD_ALIGNED_ATTR OTA_Packet_s otaPkt = {0};
 
 void ICACHE_RAM_ATTR TXdoneCallback()
 {
-  TxHandshake.busy(false);
+  if (!TxHandshake.done())
+    TxHandshake.TXdoneCallback();
 }
 
 bool ICACHE_RAM_ATTR RXdoneCallback(SX12xxDriverCommon::rx_status const status)
 {
-  // to handle multiple ack msg, ignore handshake state.
-  if (memcmp(Radio.RXdataBuffer, "ack", 3) == 0) {
-    TxHandshake.handle_wait_ack();
-    return true;
-  }
-
-  if (TxHandshake.state() == HANDSHAKE_RECV_LEA_KEY) {
-    TxHandshake.handle_recv_lea_key();
-    return true;
-  }
+  if (!TxHandshake.done())
+    TxHandshake.RXdoneCallback(status);
+  return true;
 }
 
 void rsa_test()
@@ -121,7 +115,6 @@ void setup()
   Radio.RXdoneCallback = &RXdoneCallback;
   Radio.SetFrequencyHz(2420000000, transmittingRadio);
 
-  //rsa_generate_pubkey(pubkey, &pubkey_len);
   //rsa_test();
   //lea_test();
 
@@ -134,5 +127,6 @@ void setup()
 
 void loop()
 {
+  // if (!TxHandshake.done())
   TxHandshake.do_handle();
 }

@@ -16,20 +16,15 @@ RxHandshakeClass RxHandshake;
 
 void ICACHE_RAM_ATTR TXdoneCallback()
 {
-  RxHandshake.busy(false);
+  if (!RxHandshake.done())
+    RxHandshake.TXdoneCallback();
 }
 
 bool ICACHE_RAM_ATTR RXdoneCallback(SX12xxDriverCommon::rx_status const status)
 {
-  if (RxHandshake.state() == HANDSHAKE_WAIT_HELLO) {
-    RxHandshake.handle_wait_hello();
-    return true;
-  }
-
-  if (RxHandshake.state() == HANDSHAKE_WAIT_RSA_PUB_KEY) {
-    RxHandshake.handle_recv_rsa_pub_key();
-    return true;
-  }
+  if (!RxHandshake.done())
+    RxHandshake.RXdoneCallback(status);
+  return true;
 }
 
 void setup()
@@ -49,12 +44,13 @@ void setup()
     Radio.RXdoneCallback = &RXdoneCallback;
     Radio.SetFrequencyHz(2420000000, transmittingRadio);
 
-    delay(5000);
+    delay(15000);
 
     RxHandshake.init();
 }
 
 void loop()
 {
+  // if (!RxHandshake.done())
   RxHandshake.do_handle();
 }

@@ -24,7 +24,6 @@ class TxHandshakeClass {
 
   TxHandshakeClass() {
     init();
-
   }
 
   void init() {
@@ -36,16 +35,14 @@ class TxHandshakeClass {
   }
 
   tx_handshake_state_t state() { return tx_handshake_state; };
+  inline bool done() { return tx_handshake_state == HANDSHAKE_DONE; };
 
-  bool busy() { return busyTransmitting; };
-  void busy(bool busyTransmitting_) { busyTransmitting = busyTransmitting_; };
+  inline bool busy() { return busyTransmitting; };
+  inline void busy(bool busyTransmitting_) { busyTransmitting = busyTransmitting_; };
 
   void do_handle() {
     int ret = 1;
-
-    // decrypt lea key
-    unsigned char decryptedtext[1024] = {0};
-    size_t i;
+    size_t i = 0;
 
     switch (tx_handshake_state) {
       case HANDSHAKE_INIT:
@@ -55,9 +52,9 @@ class TxHandshakeClass {
       case HANDSHAKE_HELLO:
         handshake_hello();
 
-        while (busyTransmitting) { }
+        while (busy()) { }
 
-        busyTransmitting = true;
+        busy(true);
         tx_handshake_state = HANDSHAKE_SEND_RSA_PUB_KEY;
         sender.setMaxPackageIndex(ELRS4_TELEMETRY_MAX_PACKAGES);
         sender.ResetState();
@@ -69,7 +66,7 @@ class TxHandshakeClass {
         break;
 
       case HANDSHAKE_SEND_RSA_PUB_KEY:
-        if (!busyTransmitting) {
+        if (!busy()) {
           ret = handshake_send_rsa_pub_key();
         }
         if (ret == 0) {
@@ -94,10 +91,12 @@ class TxHandshakeClass {
         if (ret != 0)
           DBGLN("FAILED DECRYPT");
 
-        if (ret == 0)
+        if (ret == 0) {
+          memcpy(K, decryptedtext, 16); memcpy(A, decryptedtext + 16, 16); memcpy(N, decryptedtext + 32, 12);
           tx_handshake_state = HANDSHAKE_DONE;
-        else
+        } else {
           tx_handshake_state = HANDSHAKE_INIT;
+        }
         break;
 
       case HANDSHAKE_DONE:
@@ -131,7 +130,7 @@ class TxHandshakeClass {
 
   void handshake_hello()
   {
-    busyTransmitting = true;
+    busy(true);
     Radio.TXnb((uint8_t*)"hello", 5, transmittingRadio);
   };
 
@@ -146,7 +145,7 @@ class TxHandshakeClass {
 
   int handshake_send_rsa_pub_key()
   {
-    busyTransmitting = true;
+    busy(true);
 
     if (pub_key_msg_seq == 8) { // last pub key msg
       pub_key_msg_seq = 0;
@@ -167,6 +166,25 @@ class TxHandshakeClass {
     return 1; // continue sending pub key
   };
 
+  void TXdoneCallback()
+  {
+    busy(false);
+  };
+
+  bool RXdoneCallback(SX12xxDriverCommon::rx_status const status)
+  {
+    // to handle multiple ack msg, ignore handshake state.
+    if (memcmp(Radio.RXdataBuffer, "ack", 3) == 0) {
+      handle_wait_ack();
+      return true;
+    }
+
+    if (state() == HANDSHAKE_RECV_LEA_KEY) {
+      handle_recv_lea_key();
+      return true;
+    }
+  };
+
  private:
   void generate_pub_key()
   {
@@ -185,10 +203,16 @@ class TxHandshakeClass {
   tx_handshake_state_t tx_handshake_state;
   bool busyTransmitting;
 
-  // lea
+  // encrypted lea key
   unsigned char lea_key[512] = {0};
   size_t lea_key_len = 0;
   int lea_key_packageIndex = 0;
+
+  // decrypt lea key
+  unsigned char decryptedtext[1024] = {0};
+  uint8_t K[16] = {0};
+  uint8_t A[16] = {0};
+  uint8_t N[12] = {0};
 
   // rsa
   unsigned char pub_key[1024] = {0};
