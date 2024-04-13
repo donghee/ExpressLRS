@@ -36,6 +36,7 @@
 #include "devBaro.h"
 #include "devMSPVTX.h"
 #include "gcm.h"
+#include "rx_handshake.h"
 
 #if defined(PLATFORM_ESP8266)
 #include <user_interface.h>
@@ -223,7 +224,10 @@ bool returnModelFromLoan = false;
 static unsigned long loanBindTimeout = LOAN_BIND_TIMEOUT_DEFAULT;
 static unsigned long loadBindingStartedMs = 0;
 
+#if defined(USE_LEA)
 GCM lea_gcm;
+RxHandshakeClass RxHandshake;
+#endif
 
 void reset_into_bootloader(void);
 void EnterBindingMode();
@@ -1120,6 +1124,14 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
 
 bool ICACHE_RAM_ATTR RXdoneISR(SX12xxDriverCommon::rx_status const status)
 {
+#if defined(USE_LEA)
+    if (!RxHandshake.IsDone())
+    {
+      RxHandshake.RXdoneCallback(status);
+      return true;
+    }
+#endif
+
     if (LQCalc.currentIsSet() && connectionState == connected)
     {
         return false; // Already received a packet, do not run ProcessRFPacket() again.
@@ -1135,6 +1147,14 @@ bool ICACHE_RAM_ATTR RXdoneISR(SX12xxDriverCommon::rx_status const status)
 
 void ICACHE_RAM_ATTR TXdoneISR()
 {
+#if defined(USE_LEA)
+    if (!RxHandshake.IsDone())
+    {
+      RxHandshake.TXdoneCallback();
+      return;
+    }
+#endif
+
 #if defined(Regulatory_Domain_EU_CE_2400)
     BeginClearChannelAssessment();
 #else
@@ -1745,6 +1765,22 @@ void resetConfigAndReboot()
 
 void setup()
 {
+#if defined(USE_LEA)
+  delay(15000);
+  Radio.Begin();
+  Radio.Config(SX1280_LORA_BW_0800, SX1280_LORA_SF6, SX1280_LORA_CR_LI_4_8,
+               0xba1b91, 12, true, DATA_SIZE, 20000, 0, 0, 0);
+  Radio.RXdoneCallback = &RXdoneISR;
+  Radio.TXdoneCallback = &TXdoneISR;
+  Radio.SetFrequencyHz(2420000000, Radio.GetLastSuccessfulPacketRadio());
+
+  RxHandshake.Init();
+
+  while (!RxHandshake.IsDone()) {
+    RxHandshake.DoHandle();
+  }
+#endif
+
     #if defined(TARGET_UNIFIED_RX)
     hardwareConfigured = options_init();
     if (!hardwareConfigured)

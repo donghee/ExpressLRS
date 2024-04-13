@@ -21,6 +21,7 @@
 #include "devPDET.h"
 #include "devBackpack.h"
 #include "gcm.h"
+#include "tx_handshake.h"
 
 //// CONSTANTS ////
 #define MSP_PACKET_SEND_INTERVAL 10LU
@@ -82,6 +83,7 @@ uint8_t CRSFinBuffer[CRSF_MAX_PACKET_LEN+1];
 GCM lea_gcm;
 unsigned long lea_elapsedTime;
 unsigned long lea_processTime;
+TxHandshakeClass TxHandshake;
 #endif
 
 device_affinity_t ui_devices[] = {
@@ -862,6 +864,13 @@ static void CheckConfigChangePending()
 
 bool ICACHE_RAM_ATTR RXdoneISR(SX12xxDriverCommon::rx_status const status)
 {
+#if defined(USE_LEA)
+  if (!TxHandshake.IsDone()) {
+    TxHandshake.RXdoneCallback(status);
+    return true;
+  }
+#endif
+
   if (LQCalc.currentIsSet())
   {
     return false; // Already received tlm, do not run ProcessTLMpacket() again.
@@ -874,6 +883,13 @@ bool ICACHE_RAM_ATTR RXdoneISR(SX12xxDriverCommon::rx_status const status)
 
 void ICACHE_RAM_ATTR TXdoneISR()
 {
+#if defined(USE_LEA)
+  if (!TxHandshake.IsDone()) {
+    TxHandshake.TXdoneCallback();
+    return;
+  }
+#endif
+
   if (!busyTransmitting)
   {
     return; // Already finished transmission and do not call HandleFHSS() a second time, which may hop the frequency!
@@ -1304,8 +1320,37 @@ static void cyclePower()
   }
 }
 
+uint8_t K[16] = {0};
+uint8_t A[16] = {0};
+uint8_t N[12] = {0};
+size_t K_len, A_len, N_len;
+
 void setup()
 {
+  #if defined(USE_LEA)
+  SX12XX_Radio_Number_t transmittingRadio = Radio.GetLastSuccessfulPacketRadio();
+
+  pinMode(GPIO_PIN_LED, OUTPUT);
+  digitalWrite(GPIO_PIN_LED, HIGH);
+
+  Serial.begin(115200);
+  Serial.println("Begin SX1280 testing...");
+
+  Radio.Begin();
+  Radio.Config(SX1280_LORA_BW_0800, SX1280_LORA_SF6, SX1280_LORA_CR_LI_4_8,
+               0xba1b91, 12, true, DATA_SIZE, 20000, 0, 0, 0);
+  Radio.TXdoneCallback = &TXdoneISR;
+  Radio.RXdoneCallback = &RXdoneISR;
+  Radio.SetFrequencyHz(2420000000, transmittingRadio);
+
+  TxHandshake.Init();
+
+  while (!TxHandshake.IsDone()) {
+    TxHandshake.DoHandle();
+  }
+  TxHandshake.LeaKey(K, K_len, A, A_len, N, N_len);
+#endif
+
   if (setupHardwareFromOptions())
   {
     initUID();
