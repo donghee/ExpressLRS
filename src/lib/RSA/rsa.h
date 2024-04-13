@@ -1,9 +1,8 @@
 #pragma once
 
 #include <Arduino.h>
-
-// #define DBGLN(x) Serial.println(x)
-#define DBGLN(x)
+#include "logging.h"
+// #define DBGLN(x)
 
 // #include "mbedtls/build_info.h"
 #include "mbedtls/bignum.h"
