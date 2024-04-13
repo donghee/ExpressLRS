@@ -11,11 +11,12 @@ int GCM::init()
 {
     int is_ok = -1;
 
-    if (GCM4LEA_set_init_params(&gcm_TX, K, 128, A, 0, 128))
+    // TODO: To reduce the packet size, the bit size of T must be reduced. 8 * 16 = 128
+    if (GCM4LEA_set_init_params(&gcm_TX, K, 128, A, 16, 32))
     {
         return is_ok; // Error
     }
-    if (GCM4LEA_set_init_params(&gcm_RX, K, 128, A, 0, 128))
+    if (GCM4LEA_set_init_params(&gcm_RX, K, 128, A, 16, 32))
     {
         return is_ok; // Error
     }
@@ -48,8 +49,9 @@ int GCM::encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen) // ota
         return is_ok; // Error
     }
 
-    memcpy((uint8_t *)data, gcm_TX.T, 16);
-    memcpy((uint8_t *)data + 16, gcm_TX.CC, 16);
+    // TODO: To reduce the packet size, the bit size of T must be reduced.
+    memcpy((uint8_t *)data, gcm_TX.T, 4);
+    memcpy((uint8_t *)data + 4, gcm_TX.CC, 16);
 
     is_ok = 0;
 
@@ -60,7 +62,7 @@ int GCM::decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen) 
 {
     int is_ok = -1;
 
-    if (GCM4LEA_set_dec_params(&gcm_RX, data + 16, 16, N, 12, data))
+    if (GCM4LEA_set_dec_params(&gcm_RX, data + 4, 16, N, 12, data))
     {
         return is_ok; // Error
     }

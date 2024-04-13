@@ -188,11 +188,12 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
   }
 
 #if defined(USE_LEA)
-  uint8_t plaintext[16] = {0};
+  uint8_t plaintext[20] = {0};
   int ret = 0;
 
   //if (lea_gcm.decrypt((OTA_Packet_s *)Radio.RXdataBuffer, payload, OTA4_LEA_PACKET_SIZE*2) != 0)
-  ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, 32);
+  // ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, 32);
+  ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, 20);
   if (ret != 0)
   {
       DBGLN("LEA GCM decrypt error");
@@ -599,7 +600,7 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
 #endif
 
 #if defined(USE_LEA)
-  uint8_t ciphertext[32] = { 0 };
+  uint8_t ciphertext[20] = { 0 };
   int ret = 0;
   //uint8_t payload_test[OTA4_LEA_PACKET_SIZE * 2] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31};
   //lea_elapsedTime = micros();
@@ -615,7 +616,7 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
   // otaPkt.std.rc.ch4 = 0;
   // otaPkt.std.crcLow = 7;
 
-  ret = lea_gcm.encrypt(&otaPkt, ciphertext, 32);
+  ret = lea_gcm.encrypt(&otaPkt, ciphertext, 20);
   if (ret != 0) {
     DBGLN("LEA GCM encrypt error");
     return;
