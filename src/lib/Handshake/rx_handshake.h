@@ -7,6 +7,8 @@
 #include "common.h"
 #include "rsa.h"
 
+#define DATA_SIZE 32
+
 class RxHandshakeClass {
  public:
   enum handshake_state_t {
