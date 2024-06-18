@@ -227,6 +227,7 @@ static unsigned long loadBindingStartedMs = 0;
 #if defined(USE_LEA)
 GCM lea_gcm;
 RxHandshakeClass RxHandshake;
+HardwareSerial DebugSerial(USART2); // TX(PA2), RX(PA3)
 #endif
 
 void reset_into_bootloader(void);
@@ -1027,6 +1028,14 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
     uint8_t fake_RadioRXdataBuffer[32] = { 0x28, 0xd0, 0xfc, 0x9b, 0x98, 0xc9, 0x82, 0x89, 0x5f, 0x91, 0x38, 0xcd, 0x35, 0x5e, 0xde, 0x5c,  0x2f,  0x85,  0x4f,  0x53,  0x8f,  0xa4,  0x3b,  0x5,  0x96,  0x65,  0x41,  0xb3,  0x32,  0x2e,  0x58,  0xca}; // crcHigh 0x27, crcLow 0x51
     int ret = 0;
 
+    // Print encrypted data for demo at 2024. 06
+    DebugSerial.write(0xC8); // sync byte
+    DebugSerial.write(0x18); // length
+    DebugSerial.write(0x16); // encrypted rc channel 
+    for (int i = 0; i < 23; i++) {
+      DebugSerial.write(Radio.RXdataBuffer[i]);
+    }
+
     ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, 20);
     //if (lea_gcm.decrypt((OTA_Packet_s *) payload, (const uint8_t *) Radio.RXdataBuffer, OTA4_LEA_PACKET_SIZE*2) != 0)
     if (ret != 0)
@@ -1394,6 +1403,12 @@ static void setupSerial()
     SerialLogger = &USBSerial;
 #else
     SerialLogger = &Serial;
+#endif
+
+#if defined(USE_LEA)
+  DebugSerial.setRx(GPIO_PIN_DEBUG_RX);
+  DebugSerial.setTx(GPIO_PIN_DEBUG_TX);
+  DebugSerial.begin(420000);
 #endif
 }
 
@@ -1766,7 +1781,8 @@ void resetConfigAndReboot()
 void setup()
 {
 #if defined(USE_LEA)
-  delay(15000);
+  //delay(15000); // 15 secs
+  delay(5000); // 5 secs
   Radio.Begin();
   Radio.Config(SX1280_LORA_BW_0800, SX1280_LORA_SF6, SX1280_LORA_CR_LI_4_8,
                0xba1b91, 12, true, DATA_SIZE, 20000, 0, 0, 0);

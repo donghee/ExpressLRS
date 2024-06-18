@@ -1320,21 +1320,21 @@ static void cyclePower()
   }
 }
 
-uint8_t K[16] = {0};
-uint8_t A[16] = {0};
-uint8_t N[12] = {0};
-size_t K_len, A_len, N_len;
-
 void setup()
 {
   #if defined(USE_LEA)
+  // LEA key
+  uint8_t K[16] = {0};
+  uint8_t A[16] = {0};
+  uint8_t N[12] = {0};
+  size_t K_len = 0;
+  size_t A_len = 0;
+  size_t N_len = 0;
+
   SX12XX_Radio_Number_t transmittingRadio = Radio.GetLastSuccessfulPacketRadio();
 
   pinMode(GPIO_PIN_LED, OUTPUT);
   digitalWrite(GPIO_PIN_LED, HIGH);
-
-  Serial.begin(115200);
-  Serial.println("Begin SX1280 testing...");
 
   Radio.Begin();
   Radio.Config(SX1280_LORA_BW_0800, SX1280_LORA_SF6, SX1280_LORA_CR_LI_4_8,
@@ -1348,6 +1348,7 @@ void setup()
   while (!TxHandshake.IsDone()) {
     TxHandshake.DoHandle();
   }
+
   TxHandshake.LeaKey(K, K_len, A, A_len, N, N_len);
 #endif
 
@@ -1434,7 +1435,8 @@ void setup()
   }
 
 #if defined(USE_LEA)
-  lea_gcm.init();
+  lea_gcm.init(K, K_len, A, A_len, N, N_len);
+  // lea_gcm.init();
 #endif
 }
 

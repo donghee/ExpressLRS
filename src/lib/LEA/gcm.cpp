@@ -7,6 +7,30 @@ GCM::GCM()
 {
 }
 
+int GCM::init(uint8_t *K_, size_t K_len_, uint8_t *A_, size_t A_len_, uint8_t *N_, size_t N_len_)
+{
+    int is_ok = -1;
+
+    memcpy(K, K_, K_len_);
+    memcpy(A, A_, A_len_);
+    memcpy(N, N_, N_len_);
+
+    // TODO: Refactor this to use the next init function
+    // TODO: To reduce the packet size, the bit size of T must be reduced. 8 * 16 = 128
+    if (GCM4LEA_set_init_params(&gcm_TX, K, 128, A, 16, 32))
+    {
+        return is_ok; // Error
+    }
+    if (GCM4LEA_set_init_params(&gcm_RX, K, 128, A, 16, 32))
+    {
+        return is_ok; // Error
+    }
+
+    is_ok = 0;
+
+    return is_ok;
+}
+
 int GCM::init()
 {
     int is_ok = -1;
@@ -24,16 +48,6 @@ int GCM::init()
     is_ok = 0;
 
     return is_ok;
-}
-
-void GCM::setKey(uint8_t *key)
-{
-    memcpy(K, key, 16);
-}
-
-void GCM::setNonce(uint8_t *nonce)
-{
-    memcpy(N, nonce, 16);
 }
 
 int GCM::encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen) // ota to data

@@ -11,7 +11,6 @@ from external.wheezy.template.engine import Engine
 from external.wheezy.template.ext.core import CoreExtension
 from external.wheezy.template.loader import FileLoader
 
-
 def get_version(env):
     return '%s (%s)' % (env.get('GIT_VERSION'), env.get('GIT_SHA'))
 
