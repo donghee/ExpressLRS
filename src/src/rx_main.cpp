@@ -226,7 +226,9 @@ static unsigned long loadBindingStartedMs = 0;
 
 #if defined(USE_LEA)
 GCM lea_gcm;
+#if defined(USE_LEA_KEY_EXCHANGE)
 RxHandshakeClass RxHandshake;
+#endif
 HardwareSerial DebugSerial(USART2); // TX(PA2), RX(PA3)
 #endif
 
@@ -1031,7 +1033,7 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
     // Print encrypted data for demo at 2024. 06
     DebugSerial.write(0xC8); // sync byte
     DebugSerial.write(0x18); // length
-    DebugSerial.write(0x16); // encrypted rc channel 
+    DebugSerial.write(0x16); // encrypted rc channel
     for (int i = 0; i < 23; i++) {
       DebugSerial.write(Radio.RXdataBuffer[i]);
     }
@@ -1133,7 +1135,7 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
 
 bool ICACHE_RAM_ATTR RXdoneISR(SX12xxDriverCommon::rx_status const status)
 {
-#if defined(USE_LEA)
+#if defined(USE_LEA) && defined(USE_LEA_KEY_EXCHANGE)
     if (!RxHandshake.IsDone())
     {
       RxHandshake.RXdoneCallback(status);
@@ -1156,7 +1158,7 @@ bool ICACHE_RAM_ATTR RXdoneISR(SX12xxDriverCommon::rx_status const status)
 
 void ICACHE_RAM_ATTR TXdoneISR()
 {
-#if defined(USE_LEA)
+#if defined(USE_LEA) && defined(USE_LEA_KEY_EXCHANGE)
     if (!RxHandshake.IsDone())
     {
       RxHandshake.TXdoneCallback();
@@ -1780,9 +1782,9 @@ void resetConfigAndReboot()
 
 void setup()
 {
-#if defined(USE_LEA)
-  //delay(15000); // 15 secs
-  delay(5000); // 5 secs
+#if defined(USE_LEA) && defined(USE_LEA_KEY_EXCHANGE)
+  delay(5000); // When using LEA key exchange, the RX must be powered up after the TX
+               // Wait up to 3~4 seconds(TX red LED turns on) after hearing the 'WELCOME TO EDGE TX' message from RC transmitter and then power up the RX radio.
   Radio.Begin();
   Radio.Config(SX1280_LORA_BW_0800, SX1280_LORA_SF6, SX1280_LORA_CR_LI_4_8,
                0xba1b91, 12, true, DATA_SIZE, 20000, 0, 0, 0);

@@ -83,7 +83,10 @@ uint8_t CRSFinBuffer[CRSF_MAX_PACKET_LEN+1];
 GCM lea_gcm;
 unsigned long lea_elapsedTime;
 unsigned long lea_processTime;
+
+#if defined(USE_LEA_KEY_EXCHANGE)
 TxHandshakeClass TxHandshake;
+#endif
 #endif
 
 device_affinity_t ui_devices[] = {
@@ -864,7 +867,7 @@ static void CheckConfigChangePending()
 
 bool ICACHE_RAM_ATTR RXdoneISR(SX12xxDriverCommon::rx_status const status)
 {
-#if defined(USE_LEA)
+#if defined(USE_LEA) && defined(USE_LEA_KEY_EXCHANGE)
   if (!TxHandshake.IsDone()) {
     TxHandshake.RXdoneCallback(status);
     return true;
@@ -883,7 +886,7 @@ bool ICACHE_RAM_ATTR RXdoneISR(SX12xxDriverCommon::rx_status const status)
 
 void ICACHE_RAM_ATTR TXdoneISR()
 {
-#if defined(USE_LEA)
+#if defined(USE_LEA) && defined(USE_LEA_KEY_EXCHANGE)
   if (!TxHandshake.IsDone()) {
     TxHandshake.TXdoneCallback();
     return;
@@ -1322,14 +1325,10 @@ static void cyclePower()
 
 void setup()
 {
-  #if defined(USE_LEA)
+#if defined(USE_LEA) && defined(USE_LEA_KEY_EXCHANGE)
   // LEA key
-  uint8_t K[16] = {0};
-  uint8_t A[16] = {0};
-  uint8_t N[12] = {0};
-  size_t K_len = 0;
-  size_t A_len = 0;
-  size_t N_len = 0;
+  uint8_t K[16] = {0}; uint8_t A[16] = {0}; uint8_t N[12] = {0};
+  size_t K_len = 0; size_t A_len = 0; size_t N_len = 0;
 
   SX12XX_Radio_Number_t transmittingRadio = Radio.GetLastSuccessfulPacketRadio();
 
@@ -1435,8 +1434,11 @@ void setup()
   }
 
 #if defined(USE_LEA)
-  lea_gcm.init(K, K_len, A, A_len, N, N_len);
-  // lea_gcm.init();
+  #if defined(USE_LEA_KEY_EXCHANGE)
+    lea_gcm.init(K, K_len, A, A_len, N, N_len);
+  #else
+    lea_gcm.init();
+  #endif
 #endif
 }
 
