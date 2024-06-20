@@ -48,8 +48,8 @@ class RxHandshakeClass {
         // encrypt LEA key using RSA public key
         memcpy(plaintext_, K_, 16);
         memcpy(plaintext_ + 16, A_, 16);
-        memcpy(plaintext_ + 32, N_, 12);
-        Encrypt(pub_key_, pub_key_len_, plaintext_, 16 + 16 + 12,
+        memcpy(plaintext_ + 32, N_, 16);
+        Encrypt(pub_key_, pub_key_len_, plaintext_, 16 + 16 + 16,
                 ciphertext_pub_, 512);
         // TODO: if encrypt success, send ack otherwise send nack
         rx_handshake_state_ = SEND_ACK;
@@ -165,12 +165,12 @@ class RxHandshakeClass {
   // LEA key
   unsigned char plaintext_[1024] = {0};
 
+  // TODO: get key from gcm class
   // generate plaintext for test
   uint8_t K_[16] = {0x14, 0x87, 0x0B, 0x99, 0x92, 0xEA, 0x89, 0x67,
                     0x8A, 0x1D, 0xDF, 0xD6, 0x30, 0x91, 0x8D, 0xF0};
   uint8_t A_[16] = {0};
-  uint8_t N_[12] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05,
-                    0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B};
+  uint8_t N_[16] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F };
 
   // encrypted ciphertext from plaintext (K,A,N)
   unsigned char ciphertext_pub_[512] = {0};

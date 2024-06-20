@@ -86,8 +86,6 @@ class TxHandshakeClass {
         if (ret != 0) DBGLN("FAILED DECRYPT");
 
         if (ret == 0) {
-          // memcpy(K_, decryptedtext, 16); memcpy(A_, decryptedtext + 16, 16);
-          // memcpy(N_, decryptedtext + 32, 12);
           tx_handshake_state_ = DONE;
         } else {
           tx_handshake_state_ = INIT;
@@ -121,10 +119,10 @@ class TxHandshakeClass {
     if (State() != DONE) return -1;
     memcpy(K, decryptedtext_, 16);
     memcpy(A, decryptedtext_ + 16, 16);
-    memcpy(N, decryptedtext_ + 32, 12);
+    memcpy(N, decryptedtext_ + 32, 16);
     K_len = 16;
     A_len = 16;
-    N_len = 12;
+    N_len = 16;
 
     return 0;
   }
@@ -215,9 +213,6 @@ class TxHandshakeClass {
 
   // decrypted text which lea key from encrypted lea key
   unsigned char decryptedtext_[1024] = {0};
-  // uint8_t K_[16] = {0};
-  // uint8_t A_[16] = {0};
-  // uint8_t N_[12] = {0};
 
   // rsa
   unsigned char pub_key_[1024] = {0};

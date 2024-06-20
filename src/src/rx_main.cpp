@@ -1031,12 +1031,16 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
     int ret = 0;
 
     // Print encrypted data for demo at 2024. 06
-    DebugSerial.write(0xC8); // sync byte
-    DebugSerial.write(0x18); // length
-    DebugSerial.write(0x16); // encrypted rc channel
-    for (int i = 0; i < 23; i++) {
-      DebugSerial.write(Radio.RXdataBuffer[i]);
-    }
+    // DebugSerial.write(0xC8); // sync byte
+    // DebugSerial.write(0x18); // length
+    // DebugSerial.write(0x16); // encrypted rc channel
+    // for (int i = 0; i < 23; i++) {
+    //   DebugSerial.write(Radio.RXdataBuffer[i]);
+    // }
+
+    // Print  LEA GCM RX counter
+    DebugSerial.write(lea_gcm.counter()>>8);
+    DebugSerial.write(lea_gcm.counter());
 
     ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, 20);
     //if (lea_gcm.decrypt((OTA_Packet_s *) payload, (const uint8_t *) Radio.RXdataBuffer, OTA4_LEA_PACKET_SIZE*2) != 0)
@@ -1783,7 +1787,7 @@ void resetConfigAndReboot()
 void setup()
 {
 #if defined(USE_LEA) && defined(USE_LEA_KEY_EXCHANGE)
-  delay(5000); // When using LEA key exchange, the RX must be powered up after the TX
+  delay(4000); // When using LEA key exchange, the RX must be powered up after the TX
                // Wait up to 3~4 seconds(TX red LED turns on) after hearing the 'WELCOME TO EDGE TX' message from RC transmitter and then power up the RX radio.
   Radio.Begin();
   Radio.Config(SX1280_LORA_BW_0800, SX1280_LORA_SF6, SX1280_LORA_CR_LI_4_8,

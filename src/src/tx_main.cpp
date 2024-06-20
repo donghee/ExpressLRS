@@ -1327,7 +1327,7 @@ void setup()
 {
 #if defined(USE_LEA) && defined(USE_LEA_KEY_EXCHANGE)
   // LEA key
-  uint8_t K[16] = {0}; uint8_t A[16] = {0}; uint8_t N[12] = {0};
+  uint8_t K[16] = {0}; uint8_t A[16] = {0}; uint8_t N[16] = {0};
   size_t K_len = 0; size_t A_len = 0; size_t N_len = 0;
 
   SX12XX_Radio_Number_t transmittingRadio = Radio.GetLastSuccessfulPacketRadio();
