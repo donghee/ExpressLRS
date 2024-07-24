@@ -19,9 +19,29 @@ void GCM::increment_nonce_counter(uint8_t *nonce)
     }
 }
 
+uint32_t GCM::encryption_time()
+{
+    delta[1] = stop[1] - start[1];
+    return delta[1];
+}
+
+uint32_t GCM::decryption_time()
+{
+    delta[2] = stop[2] - start[2];
+    return delta[2];
+}
+
 int GCM::init(uint8_t *K_, size_t K_len_, uint8_t *A_, size_t A_len_, uint8_t *N_, size_t N_len_)
 {
-    int is_ok = -1;
+    int result;
+
+    // Measurement of lea encryption and decryption time
+    if (ARM_CM_DWT_CTRL != 0) 			// See if DWT is available
+    {
+		ARM_CM_DEMCR      |= 1 << 24;	// Set bit 24
+		ARM_CM_DWT_CYCCNT  = 0;
+		ARM_CM_DWT_CTRL   |= 1 << 0;	// Set bit 0
+    }
 
     memcpy(K, K_, K_len_);
     memcpy(A, A_, A_len_);
@@ -32,49 +52,67 @@ int GCM::init(uint8_t *K_, size_t K_len_, uint8_t *A_, size_t A_len_, uint8_t *N
 	COUNTER_RX = 0; // 초기화 (COUNTER_TX와 동일한 값으로)
 	initStatus = 1;
 
-    is_ok = init();
+    result = init();
+    if (result < 0) {
+        return -1;
+    }
 
-    return is_ok;
+    return 0;
 }
 
 int GCM::init()
 {
-    int is_ok = -1;
+    int result;
 
     // Kbits= 128, Abytes=16, Tbits = 32
     // TODO: To reduce the packet size, the bit size of T must be reduced. 8 * 16 = 128
     // if (GCM4LEA_set_init_params(&gcm_TX, K, 128, A, 16, 32))
     // Tbits = 16 for nonce sync, so gcm_TX.T is 2 bytes
-    if (GCM4LEA_set_init_params(&gcm_TX, K, 128, A, 16, 16))
-    {
-        return is_ok; // Error
+    start[0] = ARM_CM_DWT_CYCCNT;
+    result = GCM4LEA_set_init_params(&gcm_TX, K, 128, A, 16, 16);
+    stop[0] = ARM_CM_DWT_CYCCNT;
+
+    if (result < 0) {
+        return -1;
     }
+
+    // if (GCM4LEA_set_init_params(&gcm_TX, K, 128, A, 16, 16))
+    // {
+    //     return is_ok; // Error
+    // }
 
     // TODO: delete other gcm_TX
     // if (GCM4LEA_set_init_params(&gcm_RX, K, 128, A, 16, 32))
     // Tbits = 16 for nonce sync, so gcm_RX.T is 2 bytes
-    if (GCM4LEA_set_init_params(&gcm_RX, K, 128, A, 16, 16))
-    {
-        return is_ok; // Error
+    result = GCM4LEA_set_init_params(&gcm_RX, K, 128, A, 16, 16);
+    if (result < 0) {
+        return -1;
     }
+    // if (GCM4LEA_set_init_params(&gcm_RX, K, 128, A, 16, 16))
+    // {
+    //     return is_ok; // Error
+    // }
+    //
+    // is_ok = 0;
 
-    is_ok = 0;
-
-    return is_ok;
+    return 0;
 }
 
 // TX
 int GCM::encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen) // ota to data
 {
-    int is_ok = -1;
+    int result;
 
-    if (GCM4LEA_set_enc_params(&gcm_TX, (uint8_t *)otaPktPtr, 16, N, 12))
-    {
-        return is_ok; // Error
+    result = GCM4LEA_set_enc_params(&gcm_TX, (uint8_t *)otaPktPtr, 16, N, 12);
+    if (result < 0) {
+        return -1;
     }
-    if (GCM4LEA_enc(&gcm_TX))
-    {
-        return is_ok; // Error
+
+    start[1] = ARM_CM_DWT_CYCCNT;
+    result =  GCM4LEA_enc(&gcm_TX);
+    stop[1] = ARM_CM_DWT_CYCCNT;
+    if (result < 0) {
+        return -1;
     }
 
     // TODO: To reduce the packet size, the bit size of T must be reduced.
@@ -89,15 +127,13 @@ int GCM::encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen) // ota
     memcpy((uint8_t *)data + 2, gcm_TX.T, 2);
     memcpy((uint8_t *)data + 4, gcm_TX.CC, 16);
 
-    is_ok = 0;
-
-    return is_ok;
+    return 0;
 }
 
 // RX
 int GCM::decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen) // data --> otaPktPtr
 {
-    int is_ok = -1;
+    int result;
 
     // counter up
 	COUNTER_RX_new = (data[0] << 8) | data[1]; // 2 bytes
@@ -126,19 +162,20 @@ int GCM::decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen) 
 
     // if (GCM4LEA_set_dec_params(&gcm_RX, data + 4, 16, N, 12, data))
     // Tbits = 16 for nonce sync, so data + 2 is pointer of gcm_RX.T
-   	if (GCM4LEA_set_dec_params(&gcm_RX, data + 4, 16, N, 12, data + 2))
-    {
-        return is_ok; // Error
+   	result =  GCM4LEA_set_dec_params(&gcm_RX, data + 4, 16, N, 12, data + 2);
+    if (result < 0) {
+        return -1;
     }
-    if (GCM4LEA_dec(&gcm_RX))
-    {
-        return is_ok; // Error
+
+    start[2] = ARM_CM_DWT_CYCCNT;
+    result = GCM4LEA_dec(&gcm_RX);
+    stop[2] = ARM_CM_DWT_CYCCNT;
+    if (result < 0) {
+        return -1;
     }
 
     // otaPktPtr = (OTA_Packet_s *)gcm_RX.PP;
     memcpy((uint8_t *)otaPktPtr, (uint8_t *)gcm_RX.PP, 16);
 
-    is_ok = 0;
-
-    return is_ok;
+    return 0;
 }

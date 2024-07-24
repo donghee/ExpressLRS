@@ -14,9 +14,14 @@ extern "C"
 
 #define LEA_MAX_PAYLOAD_SIZE (OTA8_LEA_PACKET_SIZE * 2)
 
+// Measurement of lea encryption and decryption time
+#define  ARM_CM_DEMCR      (*(uint32_t *)0xE000EDFC)
+#define  ARM_CM_DWT_CTRL   (*(uint32_t *)0xE0001000)
+#define  ARM_CM_DWT_CYCCNT (*(uint32_t *)0xE0001004)
+
+
 /*  LEA GCM encryption and decryption
  */
-
 class GCM
 {
 private:
@@ -41,6 +46,11 @@ private:
 
     void increment_nonce_counter(uint8_t *nonce);
 
+    // Measurement of lea encryption and decryption time
+    uint32_t  start[3];
+    uint32_t  stop[3];
+    uint32_t  delta[3];
+
 public:
     GCM();
     int init();
@@ -49,4 +59,8 @@ public:
     int decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen); // data --> otaPktPtr
     void reset();
     int counter() { return COUNTER_RX; };
+
+    // Measurement of lea encryption and decryption time
+    uint32_t encryption_time();
+    uint32_t decryption_time();
 };

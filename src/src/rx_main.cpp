@@ -226,6 +226,11 @@ static unsigned long loadBindingStartedMs = 0;
 
 #if defined(USE_LEA)
 GCM lea_gcm;
+volatile unsigned long lea_elapsedTime;
+volatile unsigned long lea_processTime = 0;
+volatile uint32_t long lea_processTicks = 0;
+volatile uint32_t long lea_processTicks_ = 0;
+volatile unsigned int lea_samples = 0;
 #if defined(USE_LEA_KEY_EXCHANGE)
 RxHandshakeClass RxHandshake;
 #endif
@@ -1034,15 +1039,28 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
     // DebugSerial.write(0xC8); // sync byte
     // DebugSerial.write(0x18); // length
     // DebugSerial.write(0x16); // encrypted rc channel
-    // for (int i = 0; i < 23; i++) {
+    // for (int i = 0; i < 20; i++) {
     //   DebugSerial.write(Radio.RXdataBuffer[i]);
     // }
 
-    // Print  LEA GCM RX counter
-    DebugSerial.write(lea_gcm.counter()>>8);
-    DebugSerial.write(lea_gcm.counter());
-
+    // decrypt the packet
+    lea_elapsedTime = micros();
     ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, 20);
+    lea_processTime += micros() - lea_elapsedTime;
+    lea_processTicks += lea_gcm.decryption_time();
+    lea_samples++;
+    if (lea_samples == 100) {
+        DebugSerial.print("RX average time of decryption: ");
+        DebugSerial.print(lea_processTime/100);
+        DebugSerial.print(" us, ");
+        lea_processTicks_ = lea_processTicks/100;
+        DebugSerial.print(lea_processTicks_);
+        DebugSerial.println(" ticks");
+        lea_samples = 0;
+        lea_processTime = 0;
+        lea_processTicks = 0;
+    }
+
     //if (lea_gcm.decrypt((OTA_Packet_s *) payload, (const uint8_t *) Radio.RXdataBuffer, OTA4_LEA_PACKET_SIZE*2) != 0)
     if (ret != 0)
     {
@@ -1090,6 +1108,12 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
     {
     case PACKET_TYPE_RCDATA: //Standard RC Data Packet
         ProcessRfPacket_RC(otaPktPtr);
+        // DebugSerial.print("RX RC Data: ");
+        // for (int i = 1; i < OTA8_PACKET_SIZE; i++) { // first byte is the packet type
+        //     DebugSerial.printf("0x%02x ", ((const unsigned char *)otaPktPtr)[i]);
+        // }
+        // DebugSerial.println();
+
         break;
     case PACKET_TYPE_MSPDATA:
         ProcessRfPacket_MSP(otaPktPtr);

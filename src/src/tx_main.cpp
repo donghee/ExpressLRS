@@ -81,12 +81,15 @@ uint8_t CRSFinBuffer[CRSF_MAX_PACKET_LEN+1];
 
 #if defined(USE_LEA)
 GCM lea_gcm;
-unsigned long lea_elapsedTime;
-unsigned long lea_processTime;
+volatile unsigned long lea_elapsedTime;
+volatile unsigned long lea_processTime = 0;
+volatile unsigned long lea_processTicks = 0;
+volatile unsigned int lea_samples = 0;
 
 #if defined(USE_LEA_KEY_EXCHANGE)
 TxHandshakeClass TxHandshake;
 #endif
+HardwareSerial DebugSerial(USART1); // TX(PA9), RX(PA10)
 #endif
 
 device_affinity_t ui_devices[] = {
@@ -608,7 +611,6 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
   uint8_t ciphertext[20] = { 0 };
   int ret = 0;
   //uint8_t payload_test[OTA4_LEA_PACKET_SIZE * 2] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31};
-  //lea_elapsedTime = micros();
 
   // otaPkt.std.type = 0;
   // otaPkt.std.crcHigh = 0;
@@ -621,7 +623,29 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
   // otaPkt.std.rc.ch4 = 0;
   // otaPkt.std.crcLow = 7;
 
+  // if (otaPkt.std.type == PACKET_TYPE_RCDATA) {
+  //   DebugSerial.print("TX RC Data: ");
+  //   for (int i = 1; i < OTA8_PACKET_SIZE; i++) { // first byte is the packet type
+  //     DebugSerial.printf("0x%02x ", ((const unsigned char *)&otaPkt)[i]);
+  //   }
+  //   DebugSerial.println();
+  // }
+
+  lea_elapsedTime = micros();
   ret = lea_gcm.encrypt(&otaPkt, ciphertext, 20);
+  lea_processTime += micros() - lea_elapsedTime;
+  lea_processTicks += lea_gcm.encryption_time();
+  lea_samples++;
+  if (lea_samples == 100) {
+    DebugSerial.print("TX average time of encryption: ");
+    DebugSerial.print(lea_processTime/100);
+    DebugSerial.print(" us, ");
+    DebugSerial.print(lea_processTicks/100);
+    DebugSerial.println(" ticks");
+    lea_samples = 0;
+    lea_processTime = 0;
+    lea_processTicks = 0;
+  }
   if (ret != 0) {
     DBGLN("LEA GCM encrypt error");
     return;
@@ -633,7 +657,6 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
   //   DBGLN("LEA GCM decrypt error");
   // }
 
-  //lea_processTime = micros() - lea_elapsedTime;
   Radio.TXnb((uint8_t*)ciphertext, sizeof(ciphertext), transmittingRadio);
 #else
   //  delayMicroseconds(500);
@@ -1241,6 +1264,12 @@ static void setupSerial()
   UNUSED(portConflict);
   UNUSED(rxPin);
   UNUSED(txPin);
+#endif
+
+#if defined(USE_LEA)
+  DebugSerial.setRx(GPIO_PIN_DEBUG_RX);
+  DebugSerial.setTx(GPIO_PIN_DEBUG_TX);
+  DebugSerial.begin(420000);
 #endif
 }
 
