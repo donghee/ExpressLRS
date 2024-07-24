@@ -45,8 +45,8 @@
 // #define GPIO_PIN_DEBUG_RX           PA_3 // WTF! It's used for AMP_DET
 // #define GPIO_PIN_DEBUG_TX           PA_2
 
-#define GPIO_PIN_DEBUG_RX           PB_11 // WTF! It's used for AMP_DET
-#define GPIO_PIN_DEBUG_TX           PB_10
+#define GPIO_PIN_DEBUG_RX           PA_10
+#define GPIO_PIN_DEBUG_TX           PA_9
 
 // Output Power
 #define MinPower                    PWR_10mW
