@@ -351,7 +351,7 @@ void SetRFLinkRate(uint8_t index) // Set speed of RF link
     hwTimer::updateInterval(interval);
     Radio.Config(ModParams->bw, ModParams->sf, ModParams->cr, GetInitialFreq(),
 #if defined(USE_LEA)
-                 ModParams->PreambleLen, invertIQ, 32, 0
+                 ModParams->PreambleLen, invertIQ, 20, 0
 #else
                  ModParams->PreambleLen, invertIQ, ModParams->PayloadLength, 0
 #endif
@@ -406,7 +406,7 @@ bool ICACHE_RAM_ATTR HandleFHSS()
     }
     else
     {
-      //        Radio.SetFrequencyReg(FHSSgetNextFreq());
+             Radio.SetFrequencyReg(FHSSgetNextFreq());
     }
 
 #if defined(RADIO_SX127X)

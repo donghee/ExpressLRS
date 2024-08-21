@@ -1,17 +1,21 @@
-#openocd or jlink
 file .pio/build/LEA_2400_TX_via_STLINK/firmware.elf
-target extended-remote localhost:2331
-monitor reset
+# openocd or jlink: sudo openocd
+#target extended-remote :2331
+# pyocd: sudo pyocd gdbserver --persist -t stm32f405rgtx
+target extended-remote :3333
+
+# enabling access to memory mapped IO
 set mem inaccessible-by-default off
-load
+load .pio/build/LEA_2400_TX_via_STLINK/firmware.elf
+#monitor reset
 
 #break main
 #break SendRCdataToRF
 #break tx_main.cpp:602
 #break tx_main.cpp:554
 
-define pp
-p/x payload
-next
-c
-end
+#define pp
+#p/x payload
+#next
+#c
+#end
