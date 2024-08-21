@@ -1,12 +1,18 @@
-# blackmagic probe
 file .pio/build/LEA_2400_RX_via_STLINK/firmware.elf
+# blackmagic probe: blackmagic -d /dev/ttyBmpGdbD5DDBEF5
 #target extended-remote /dev/ttyBmpGdb
-target extended-remote localhost:2000
-monitor reset
+target extended-remote :2000
+
+# finding connected targets
 monitor swdp_scan
+
+# attaching to target
 attach 1
+
+# enabling access to memory mapped IO
 set mem inaccessible-by-default off
 load .pio/build/LEA_2400_RX_via_STLINK/firmware.elf
+#monitor reset
 
 # break main
 #break ProcessRFPacket
