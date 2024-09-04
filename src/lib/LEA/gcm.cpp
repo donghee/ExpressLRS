@@ -103,7 +103,7 @@ int GCM::encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen) // ota
 {
     int result;
 
-    result = GCM4LEA_set_enc_params(&gcm_TX, (uint8_t *)otaPktPtr, 16, N, 12);
+    result = GCM4LEA_set_enc_params(&gcm_TX, (uint8_t *)otaPktPtr, 13, N, 12);
     if (result < 0) {
         return -1;
     }
@@ -125,7 +125,7 @@ int GCM::encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen) // ota
     data[0] = (uint8_t)(COUNTER_TX >> 8); // 2 bytes
     data[1] = (uint8_t)COUNTER_TX;
     memcpy((uint8_t *)data + 2, gcm_TX.T, 2);
-    memcpy((uint8_t *)data + 4, gcm_TX.CC, 16);
+    memcpy((uint8_t *)data + 4, gcm_TX.CC, 13);
 
     return 0;
 }
@@ -162,7 +162,7 @@ int GCM::decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen) 
 
     // if (GCM4LEA_set_dec_params(&gcm_RX, data + 4, 16, N, 12, data))
     // Tbits = 16 for nonce sync, so data + 2 is pointer of gcm_RX.T
-   	result =  GCM4LEA_set_dec_params(&gcm_RX, data + 4, 16, N, 12, data + 2);
+   	result =  GCM4LEA_set_dec_params(&gcm_RX, data + 4, 13, N, 12, data + 2);
     if (result < 0) {
         return -1;
     }
@@ -175,7 +175,7 @@ int GCM::decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen) 
     }
 
     // otaPktPtr = (OTA_Packet_s *)gcm_RX.PP;
-    memcpy((uint8_t *)otaPktPtr, (uint8_t *)gcm_RX.PP, 16);
+    memcpy((uint8_t *)otaPktPtr, (uint8_t *)gcm_RX.PP, 13);
 
     return 0;
 }
