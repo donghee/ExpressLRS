@@ -215,7 +215,7 @@ void TxConfig::Load()
 {
     m_modified = 0;
     m_eeprom->Get(0, m_config);
-    m_config.model_config[0].rate = 9;
+    m_config.model_config[0].rate = 5;
     uint32_t version = 0;
     if ((m_config.version & CONFIG_MAGIC_MASK) == TX_CONFIG_MAGIC)
         version = m_config.version & ~CONFIG_MAGIC_MASK;
@@ -697,7 +697,7 @@ void RxConfig::Load()
 {
     m_modified = false;
     m_eeprom->Get(0, m_config);
-    m_config.rateInitialIdx = 9;
+    m_config.rateInitialIdx = 5;
     uint32_t version = 0;
     if ((m_config.version & CONFIG_MAGIC_MASK) == RX_CONFIG_MAGIC)
         version = m_config.version & ~CONFIG_MAGIC_MASK;
