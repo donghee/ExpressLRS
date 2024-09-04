@@ -208,8 +208,7 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
       return false;
   }
 
-  // OTA_Packet_s * const otaPktPtr = (OTA_Packet_s * const)plaintext;
-  OTA_Packet_s * const otaPktPtr = (OTA_Packet_s * const)Radio.RXdataBuffer;
+  OTA_Packet_s * const otaPktPtr = (OTA_Packet_s * const)plaintext;
 #else
   OTA_Packet_s * const otaPktPtr = (OTA_Packet_s * const)Radio.RXdataBuffer;
 #endif
