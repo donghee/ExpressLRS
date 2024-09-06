@@ -11,8 +11,9 @@ extern "C"
 
 #define OTA8_LEA_PACKET_SIZE (OTA8_PACKET_SIZE + 3) // NEEDS TO BE MULTIPLE OF 16
 #define OTA4_LEA_PACKET_SIZE (OTA4_PACKET_SIZE + 8) // LEA unit block size is 128 bits
-
 #define LEA_MAX_PAYLOAD_SIZE (OTA8_LEA_PACKET_SIZE * 2)
+
+#define LEA_ADD_PACKET_SIZE 4 // 2 bytes for counter, 2 bytes for T
 
 // Measurement of lea encryption and decryption time
 #define  ARM_CM_DEMCR      (*(uint32_t *)0xE000EDFC)

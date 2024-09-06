@@ -76,11 +76,6 @@ int GCM::init()
         return -1;
     }
 
-    // if (GCM4LEA_set_init_params(&gcm_TX, K, 128, A, 16, 16))
-    // {
-    //     return is_ok; // Error
-    // }
-
     // TODO: delete other gcm_TX
     // if (GCM4LEA_set_init_params(&gcm_RX, K, 128, A, 16, 32))
     // Tbits = 16 for nonce sync, so gcm_RX.T is 2 bytes
@@ -88,12 +83,6 @@ int GCM::init()
     if (result < 0) {
         return -1;
     }
-    // if (GCM4LEA_set_init_params(&gcm_RX, K, 128, A, 16, 16))
-    // {
-    //     return is_ok; // Error
-    // }
-    //
-    // is_ok = 0;
 
     return 0;
 }
@@ -103,7 +92,7 @@ int GCM::encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen) // ota
 {
     int result;
 
-    result = GCM4LEA_set_enc_params(&gcm_TX, (uint8_t *)otaPktPtr, 13, N, 12);
+    result = GCM4LEA_set_enc_params(&gcm_TX, (uint8_t *)otaPktPtr, OTA8_PACKET_SIZE, N, 12);
     if (result < 0) {
         return -1;
     }
@@ -115,9 +104,6 @@ int GCM::encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen) // ota
         return -1;
     }
 
-    // TODO: To reduce the packet size, the bit size of T must be reduced.
-    // memcpy((uint8_t *)data, gcm_TX.T, 4);
-
     // counter up
     COUNTER_TX = (COUNTER_TX + 1) % 65536;
     increment_nonce_counter(N);
@@ -125,7 +111,7 @@ int GCM::encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen) // ota
     data[0] = (uint8_t)(COUNTER_TX >> 8); // 2 bytes
     data[1] = (uint8_t)COUNTER_TX;
     memcpy((uint8_t *)data + 2, gcm_TX.T, 2);
-    memcpy((uint8_t *)data + 4, gcm_TX.CC, 13);
+    memcpy((uint8_t *)data + 4, gcm_TX.CC, OTA8_PACKET_SIZE);
 
     return 0;
 }
@@ -160,9 +146,8 @@ int GCM::decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen) 
 		// 초기화, 비정상적인 상황에 대한 예외처리
 	}
 
-    // if (GCM4LEA_set_dec_params(&gcm_RX, data + 4, 16, N, 12, data))
     // Tbits = 16 for nonce sync, so data + 2 is pointer of gcm_RX.T
-   	result =  GCM4LEA_set_dec_params(&gcm_RX, data + 4, 13, N, 12, data + 2);
+   	result =  GCM4LEA_set_dec_params(&gcm_RX, data + 4, OTA8_PACKET_SIZE, N, 12, data + 2);
     if (result < 0) {
         return -1;
     }
@@ -174,8 +159,7 @@ int GCM::decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen) 
         return -1;
     }
 
-    // otaPktPtr = (OTA_Packet_s *)gcm_RX.PP;
-    memcpy((uint8_t *)otaPktPtr, (uint8_t *)gcm_RX.PP, 13);
+    memcpy((uint8_t *)otaPktPtr, (uint8_t *)gcm_RX.PP, OTA8_PACKET_SIZE);
 
     return 0;
 }

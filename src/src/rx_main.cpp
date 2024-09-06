@@ -349,12 +349,13 @@ void SetRFLinkRate(uint8_t index) // Set speed of RF link
     interval = interval * 12 / 10; // increase the packet interval by 20% to allow adding packet header
 #endif
 #if defined(USE_LEA) && defined(RADIO_SX128X)
-    interval = interval * 13.5 / 10; // increase the packet interval by 35% to allow adding lea packet header
+    interval = interval * 14.5 / 10; // increase the packet interval by 35% to allow adding lea packet header
+                                     // Why 45%? It is as follows. addtional lea packet is more than 30%, so add 40% to the original interval.
 #endif
     hwTimer::updateInterval(interval);
     Radio.Config(ModParams->bw, ModParams->sf, ModParams->cr, GetInitialFreq(),
 #if defined(USE_LEA)
-                 ModParams->PreambleLen, invertIQ, 20-3, 0
+                 ModParams->PreambleLen, invertIQ, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE, 0
 #else
                  ModParams->PreambleLen, invertIQ, ModParams->PayloadLength, 0
 #endif
@@ -534,8 +535,8 @@ bool ICACHE_RAM_ATTR HandleSendTelemetryResponse()
     }
 
 #if defined(USE_LEA)
-    uint8_t ciphertext[20-3] = { 0 };
-    if (lea_gcm.encrypt(&otaPkt, ciphertext, 20-3) != 0)
+    uint8_t ciphertext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = { 0 };
+    if (lea_gcm.encrypt(&otaPkt, ciphertext, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE) != 0)
     {
       DBGLN("LEA GCM encrypt error");
       return false;
@@ -1033,9 +1034,7 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
     uint32_t const beginProcessing = micros();
 
 #if defined(USE_LEA)
-    uint8_t plaintext[20-3] = {0};
-    uint8_t fake_plaintext[16] = {0};
-    uint8_t fake_RadioRXdataBuffer[32] = { 0x28, 0xd0, 0xfc, 0x9b, 0x98, 0xc9, 0x82, 0x89, 0x5f, 0x91, 0x38, 0xcd, 0x35, 0x5e, 0xde, 0x5c,  0x2f,  0x85,  0x4f,  0x53,  0x8f,  0xa4,  0x3b,  0x5,  0x96,  0x65,  0x41,  0xb3,  0x32,  0x2e,  0x58,  0xca}; // crcHigh 0x27, crcLow 0x51
+    uint8_t plaintext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = {0};
     int ret = 0;
 
     // Print encrypted data for demo at 2024. 06
@@ -1048,7 +1047,7 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
 
     // decrypt the packet
     lea_elapsedTime = micros();
-    ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, 20-3);
+    ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
     lea_processTime += micros() - lea_elapsedTime;
     lea_processTicks += lea_gcm.decryption_time();
     lea_samples++;
@@ -1063,8 +1062,6 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
         lea_processTime = 0;
         lea_processTicks = 0;
     }
-
-    //if (lea_gcm.decrypt((OTA_Packet_s *) payload, (const uint8_t *) Radio.RXdataBuffer, OTA4_LEA_PACKET_SIZE*2) != 0)
     if (ret != 0)
     {
         DBGLN("LEA GCM decrypt error");
@@ -1072,21 +1069,6 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
     }
 
     OTA_Packet_s * otaPktPtr = (OTA_Packet_s * )plaintext;
-
-    // if (otaPktPtr->std.type == 0) {
-    //   ret = lea_gcm.decrypt((OTA_Packet_s *) fake_plaintext, (const uint8_t *) fake_RadioRXdataBuffer, 32);
-    //   if (ret != 0)
-    //     {
-    //       DBGLN("LEA GCM decrypt error");
-    //       return false;
-    //     }
-
-    //   OTA_Packet_s * fake_otaPktPtr = (OTA_Packet_s * )fake_plaintext;
-
-    //   memcpy(otaPktPtr, fake_otaPktPtr, 8);
-    //   otaPktPtr->std.crcHigh = 0x0e;
-    //   otaPktPtr->std.crcLow = 0xe6;
-    // }
 #else
     OTA_Packet_s * const otaPktPtr = (OTA_Packet_s * const)Radio.RXdataBuffer;
 #endif

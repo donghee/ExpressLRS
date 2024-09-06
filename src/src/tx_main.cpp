@@ -196,12 +196,10 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
   }
 
 #if defined(USE_LEA)
-  uint8_t plaintext[20-3] = {0};
+  uint8_t plaintext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = {0};
   int ret = 0;
 
-  //if (lea_gcm.decrypt((OTA_Packet_s *)Radio.RXdataBuffer, payload, OTA4_LEA_PACKET_SIZE*2) != 0)
-  // ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, 32);
-  ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, 20-3);
+  ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
   if (ret != 0)
   {
       DBGLN("LEA GCM decrypt error");
@@ -389,12 +387,12 @@ void SetRFLinkRate(uint8_t index) // Set speed of RF link (hz)
   interval = interval * 12 / 10; // increase the packet interval by 20% to allow adding packet header
 #endif
 #if defined(USE_LEA) && defined(RADIO_SX128X)
-  interval = interval * 13.5 / 10; // increase the packet interval by 35% to allow adding lea packet header
+  interval = interval * 14.5 / 10; // increase the packet interval by 45% to allow adding lea packet header
 #endif
   hwTimer::updateInterval(interval);
   Radio.Config(ModParams->bw, ModParams->sf, ModParams->cr, GetInitialFreq(),
 #if defined(USE_LEA)
-               ModParams->PreambleLen, invertIQ, 20-3, ModParams->interval
+               ModParams->PreambleLen, invertIQ, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE, interval
 #else
                ModParams->PreambleLen, invertIQ, ModParams->PayloadLength, ModParams->interval
 #endif
@@ -610,20 +608,8 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
 #endif
 
 #if defined(USE_LEA)
-  uint8_t ciphertext[20-3] = { 0 };
+  uint8_t ciphertext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = { 0 };
   int ret = 0;
-  //uint8_t payload_test[OTA4_LEA_PACKET_SIZE * 2] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31};
-
-  // otaPkt.std.type = 0;
-  // otaPkt.std.crcHigh = 0;
-  // otaPkt.std.rc.ch.raw[0] = 1;
-  // otaPkt.std.rc.ch.raw[1] = 2;
-  // otaPkt.std.rc.ch.raw[2] = 3;
-  // otaPkt.std.rc.ch.raw[3] = 4;
-  // otaPkt.std.rc.ch.raw[4] = 5;
-  // otaPkt.std.rc.switches = 6;
-  // otaPkt.std.rc.ch4 = 0;
-  // otaPkt.std.crcLow = 7;
 
   // if (otaPkt.std.type == PACKET_TYPE_RCDATA) {
   //   DebugSerial.print("TX RC Data: ");
@@ -634,7 +620,7 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
   // }
 
   lea_elapsedTime = micros();
-  ret = lea_gcm.encrypt(&otaPkt, ciphertext, 20-3);
+  ret = lea_gcm.encrypt(&otaPkt, ciphertext, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
   lea_processTime += micros() - lea_elapsedTime;
   lea_processTicks += lea_gcm.encryption_time();
   lea_samples++;
@@ -653,15 +639,8 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
     return;
   }
 
-  // uint8_t plaintext[16] = { 0 };
-  // ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) ciphertext, 32);
-  // if (ret != 0) {
-  //   DBGLN("LEA GCM decrypt error");
-  // }
-
   Radio.TXnb((uint8_t*)ciphertext, sizeof(ciphertext), transmittingRadio);
 #else
-  //  delayMicroseconds(500);
   Radio.TXnb((uint8_t*)&otaPkt, ExpressLRS_currAirRate_Modparams->PayloadLength, transmittingRadio);
 #endif
 }

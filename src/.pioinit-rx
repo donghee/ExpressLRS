@@ -13,15 +13,4 @@ attach 1
 set mem inaccessible-by-default off
 load .pio/build/LEA_2400_RX_via_STLINK/firmware.elf
 #monitor reset
-
-# break main
-#break ProcessRFPacket
-#break GCM::decrypt
-
-# define pp
-# next
-# next
-# next
-# p/x Radio.RXdataBuffer@2
-# c
-# end
+c
