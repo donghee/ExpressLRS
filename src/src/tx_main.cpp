@@ -542,7 +542,8 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
       }
 
       // send channel data next so the channel messages also get sent during msp transmissions
-      NextPacketIsMspData = false;
+      //  NextPacketIsMspData = false;
+      NextPacketIsMspData = true;
       // counter can be increased even for normal msp messages since it's reset if a real bind message should be sent
       BindingSendCount++;
       // If the telemetry ratio isn't already 1:2, send a sync packet to boost it
@@ -1450,6 +1451,8 @@ void setup()
     lea_gcm.init();
   #endif
 #endif
+  config.SetTlm(TLM_RATIO_1_2); // Force TLM ratio of 1:2 for balanced bi-dir link
+  config.SetMotionMode(0); // Ensure motion detection is off
 }
 
 void loop()
