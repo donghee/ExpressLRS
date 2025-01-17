@@ -1,8 +1,8 @@
 file .pio/build/LEA_2400_TX_via_STLINK/firmware.elf
 # openocd or jlink: sudo openocd
-target extended-remote :2331
-# pyocd: sudo pyocd gdbserver --persist -t stm32f405rgtx
-#target extended-remote :3333
+#target extended-remote :2331
+# pyocd: pyocd gdbserver --persist -t stm32f405rgtx -u 005100303232511739353236 -p 3333 -T 4444 # TX STLINK-V3
+target extended-remote :3333
 
 # enabling access to memory mapped IO
 set mem inaccessible-by-default off
