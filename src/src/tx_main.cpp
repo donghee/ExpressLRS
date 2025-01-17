@@ -91,6 +91,8 @@ TxHandshakeClass TxHandshake;
 #endif
 HardwareSerial DebugSerial(USART1); // TX(PA9), RX(PA10)
 #endif
+volatile uint32_t msp_elapsedTime;
+volatile uint32_t dt;
 
 device_affinity_t ui_devices[] = {
   {&CRSF_device, 1},
@@ -550,6 +552,20 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
       // to add bandwidth for the reply
       if (ExpressLRS_currTlmDenom != 2)
         syncSpamCounter = 1;
+
+      const uint32_t now_ms = millis();
+      dt = now_ms - msp_elapsedTime;
+#if defined(USE_LEA)
+      DebugSerial.print("TX MSP hz: ");
+      DebugSerial.print(dt);
+      DebugSerial.println("us");
+#endif
+      msp_elapsedTime = now_ms;
+      if (otaPkt.full.msp_ul.payload[3] == 0x7C)
+      {
+        // __BKPT();
+      }
+
     }
     else
     {
@@ -1451,8 +1467,9 @@ void setup()
     lea_gcm.init();
   #endif
 #endif
-  config.SetTlm(TLM_RATIO_1_2); // Force TLM ratio of 1:2 for balanced bi-dir link
-  config.SetMotionMode(0); // Ensure motion detection is off
+  // config.SetTlm(TLM_RATIO_1_2); // Force TLM ratio of 1:2 for balanced bi-dir link
+  // config.SetMotionMode(0); // Ensure motion detection is off
+  // config.SetRate(enumRatetoIndex(RATE_LORA_333HZ_8CH));
 }
 
 void loop()
