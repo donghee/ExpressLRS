@@ -4,10 +4,10 @@
 
 case "$1" in
   "TX")
-pio run -e LEA_2400_TX_via_STLINK --target clean && pio debug -e LEA_2400_TX_via_STLINK
+$HOME/.platformio/penv/bin/pio run -e LEA_2400_TX_via_STLINK --target clean && $HOME/.platformio/penv/bin/pio debug -e LEA_2400_TX_via_STLINK
     ;;
 	"RX")
-pio run -e LEA_2400_RX_via_STLINK --target clean && pio debug -e LEA_2400_RX_via_STLINK
+$HOME/.platformio/penv/bin/pio run -e LEA_2400_RX_via_STLINK --target clean && $HOME/.platformio/penv/bin/pio debug -e LEA_2400_RX_via_STLINK
     ;;
 	 *)
      echo "TX or RX"

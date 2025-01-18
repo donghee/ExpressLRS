@@ -1,0 +1,15 @@
+name: ExpressLRS LEA
+on_project_start: ./build.sh TX; ./build.sh RX
+windows:
+  - tx:
+      layout: main-vertical
+      panes:
+        - vim src/tx_main.cpp
+        - pyocd gdbserver --persist -t stm32f405rgtx -u 005100303232511739353236 -p 3333 -T 4444 # TX STLINK-V3
+        - ./build.sh TX && ./debug.sh TX
+  - rx:
+      layout: main-vertical
+      panes:
+        - vim src/rx_main.cpp
+        - blackmagic -d /dev/ttyBmpGdbD5DDBEF5 # RX blackmagic probe
+        - ./build.sh RX && ./debug.sh RX
