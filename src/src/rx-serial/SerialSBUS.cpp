@@ -74,4 +74,9 @@ uint32_t SerialSBUS::sendRCFrame(bool frameAvailable, uint32_t *channelData)
     return SBUS_CALLBACK_INTERVAL_MS;
 }
 
+uint32_t SerialSBUS::sendRCFrameEncrypted(bool frameAvailable, uint8_t *channelDataEncrypted)
+{
+    return DURATION_IMMEDIATELY;
+}
+
 #endif

@@ -580,6 +580,24 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
       {
         injectBackpackPanTiltRollData(now);
         OtaPackChannelData(&otaPkt, ChannelData, TelemetryReceiver.GetCurrentConfirm(), ExpressLRS_currTlmDenom);
+        otaPkt.full.rc.packetType = PACKET_TYPE_RCDATA;
+        otaPkt.full.rc.telemetryStatus = TelemetryReceiver.GetCurrentConfirm();
+        otaPkt.full.rc.uplinkPower = constrain(CRSF::LinkStatistics.uplink_TX_Power, 1, 8) - 1;
+        otaPkt.full.rc.isHighAux = 0;
+        otaPkt.full.rc.ch4 = CRSF_to_BIT(ChannelData[4]);
+
+        // ChannelDataEncrypted[1] = 0x09;
+        // ChannelDataEncrypted[2] = 0x08;
+        // ChannelDataEncrypted[3] = 0x07;
+        // ChannelDataEncrypted[4] = 0x06;
+        // ChannelDataEncrypted[5] = 0x05;
+        // ChannelDataEncrypted[6] = 0x04;
+        // ChannelDataEncrypted[7] = 0x03;
+        // ChannelDataEncrypted[8] = 0x02;
+        // ChannelDataEncrypted[9] = 0x01;
+        // ChannelDataEncrypted[10] = 0x00;
+
+        memcpy(&otaPkt.full.rc_encrypted.raw, ChannelDataEncrypted+1, 10);
       }
     }
   }

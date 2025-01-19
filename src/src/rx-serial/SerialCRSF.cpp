@@ -108,6 +108,33 @@ uint32_t SerialCRSF::sendRCFrame(bool frameAvailable, uint32_t *channelData)
     return DURATION_IMMEDIATELY;
 }
 
+uint32_t SerialCRSF::sendRCFrameEncrypted(bool frameAvailable, uint8_t *channelDataEncrypted)
+{
+    if (!frameAvailable)
+        return DURATION_IMMEDIATELY;
+
+    const uint8_t RCframeEncryptedLength = 11;
+
+    constexpr uint8_t outBuffer[] = {
+        // No need for length prefix as we aren't using the FIFO
+        CRSF_ADDRESS_FLIGHT_CONTROLLER,
+        RCframeEncryptedLength + 2,
+        CRSF_FRAMETYPE_RC_CHANNELS_ENCRYPTED
+    };
+
+    crsf_channels_encrypted_s PackedRCdataOut;
+    memcpy(&PackedRCdataOut, channelDataEncrypted, RCframeEncryptedLength);
+
+    uint8_t crc = crsf_crc.calc(outBuffer[2]);
+    crc = crsf_crc.calc((byte *)&PackedRCdataOut, RCframeEncryptedLength, crc);
+
+    _outputPort->write(outBuffer, sizeof(outBuffer));
+    _outputPort->write((byte *)&PackedRCdataOut, RCframeEncryptedLength);
+    _outputPort->write(crc);
+
+    return DURATION_IMMEDIATELY;
+}
+
 void SerialCRSF::queueMSPFrameTransmission(uint8_t* data)
 {
     const uint8_t totalBufferLen = CRSF_FRAME_SIZE(data[1]);

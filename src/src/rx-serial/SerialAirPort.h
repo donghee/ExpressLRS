@@ -14,6 +14,7 @@ public:
     void queueLinkStatisticsPacket() override {}
     void queueMSPFrameTransmission(uint8_t* data) override {}
     uint32_t sendRCFrame(bool frameAvailable, uint32_t *channelData) override;
+    uint32_t sendRCFrameEncrypted(bool frameAvailable, uint8_t *channelDataEncrypted) override;
 
     int getMaxSerialReadSize() override;
     void sendQueuedData(uint32_t maxBytesToSend) override;

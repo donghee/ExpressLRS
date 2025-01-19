@@ -124,8 +124,8 @@
 #-DUSE_AIRPORT_AT_BAUD=9600
 
 # USE LEA Encryption
--DUSE_LEA
+#-DUSE_LEA
 # USE LEA key exchange with TX and RX using RSA pubkey.
 # When using LEA key exchange, the RX must be powered up after the TX.
 # Wait up to 3~4 seconds(TX red LED turns on) after hearing the 'WELCOME TO EDGE TX' message from RC transmitter and then power up the RX radio.
--DUSE_LEA_KEY_EXCHANGE
+#-DUSE_LEA_KEY_EXCHANGE

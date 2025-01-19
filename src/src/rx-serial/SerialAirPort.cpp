@@ -14,6 +14,11 @@ uint32_t SerialAirPort::sendRCFrame(bool frameAvailable, uint32_t *channelData)
     return DURATION_IMMEDIATELY;
 }
 
+uint32_t SerialAirPort::sendRCFrameEncrypted(bool frameAvailable, uint8_t *channelDataEncrypted)
+{
+    return DURATION_IMMEDIATELY;
+}
+
 int SerialAirPort::getMaxSerialReadSize()
 {
     return AP_MAX_BUF_LEN - apInputBuffer.size();

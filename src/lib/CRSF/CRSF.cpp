@@ -367,6 +367,18 @@ void ICACHE_RAM_ATTR CRSF::RcPacketToChannelsData() // data is packed as 11 bits
     }
 }
 
+void ICACHE_RAM_ATTR CRSF::RcPacketToChannelsEncryptedData()
+{
+    // for monitoring arming state
+    uint32_t prev_AUX1 = ChannelData[4];
+
+    uint8_t const * const payload = (uint8_t const * const)&CRSF::inBuffer.asRCPacketEncrypted_t.channels;
+    crsf_channels_encrypted_t *ch = (crsf_channels_encrypted_t *)payload;
+    ChannelData[4] = BIT_to_CRSF(ch->ch4);
+
+    memcpy(ChannelDataEncrypted, payload, 1+10); // 1 byte for the packet type + 10 bytes for Encrypted channel data
+}
+
 bool ICACHE_RAM_ATTR CRSF::ProcessPacket()
 {
     bool packetReceived = false;
@@ -387,6 +399,12 @@ bool ICACHE_RAM_ATTR CRSF::ProcessPacket()
     {
         CRSF::RCdataLastRecv = micros();
         RcPacketToChannelsData();
+        packetReceived = true;
+    }
+    else if (packetType == CRSF_FRAMETYPE_RC_CHANNELS_ENCRYPTED)
+    {
+        CRSF::RCdataLastRecv = micros();
+        RcPacketToChannelsEncryptedData();
         packetReceived = true;
     }
     // check for all extended frames that are a broadcast or a message to the FC

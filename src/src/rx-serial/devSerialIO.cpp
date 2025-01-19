@@ -40,7 +40,8 @@ static int timeout()
     // only send frames if we have a model match
     if (connectionHasModelMatch)
     {
-        duration = serialIO->sendRCFrame(frameAvailable, ChannelData);
+        // duration = serialIO->sendRCFrame(frameAvailable, ChannelData);
+        duration = serialIO->sendRCFrameEncrypted(frameAvailable, ChannelDataEncrypted);
     }
     frameAvailable = false;
     // still get telemetry and send link stats if theres no model match

@@ -236,6 +236,7 @@ RxHandshakeClass RxHandshake;
 #endif
 HardwareSerial DebugSerial(USART2); // TX(PA2), RX(PA3)
 #endif
+HardwareSerial DebugSerial(USART2); // TX(PA2), RX(PA3)
 
 void reset_into_bootloader(void);
 void EnterBindingMode();
@@ -869,6 +870,19 @@ void GotConnection(unsigned long now)
     DBGLN("got conn");
 }
 
+bool ICACHE_RAM_ATTR UnpackChannelDataEncrypted(OTA_Packet_s const * const otaPktPtr, uint8_t *channelDataEncrypted, uint8_t const tlmDenom)
+{
+    (void)tlmDenom;
+
+    OTA_Packet8_s const * const ota8 = (OTA_Packet8_s const * const)otaPktPtr;
+    memcpy(channelDataEncrypted, ota8, 11); // TODO - this is a hack, we should be able to copy the whole packet
+    ChannelData[4] = BIT_to_CRSF(ota8->rc.ch4);
+
+    // Restore the uplink_TX_Power range 0-7 -> 1-8
+    CRSF::updateUplinkPower(ota8->rc.uplinkPower + 1);
+    return ota8->rc.telemetryStatus;
+}
+
 static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPktPtr)
 {
     // Must be fully connected to process RC packets, prevents processing RC
@@ -876,7 +890,9 @@ static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPkt
     if (connectionState != connected || SwitchModePending)
         return;
 
-    bool telemetryConfirmValue = OtaUnpackChannelData(otaPktPtr, ChannelData, ExpressLRS_currTlmDenom);
+    // bool telemetryConfirmValue = OtaUnpackChannelData(otaPktPtr, ChannelData, ExpressLRS_currTlmDenom);
+    bool telemetryConfirmValue = UnpackChannelDataEncrypted(otaPktPtr, ChannelDataEncrypted, ExpressLRS_currTlmDenom);
+
     TelemetrySender.ConfirmCurrentPayload(telemetryConfirmValue);
 
     // No channels packets to the FC or PWM pins if no model match
@@ -1425,6 +1441,10 @@ static void setupSerial()
   DebugSerial.setTx(GPIO_PIN_DEBUG_TX);
   DebugSerial.begin(420000);
 #endif
+  DebugSerial.setRx(GPIO_PIN_DEBUG_RX);
+  DebugSerial.setTx(GPIO_PIN_DEBUG_TX);
+  DebugSerial.begin(420000);
+#
 }
 
 static void serialShutdown()

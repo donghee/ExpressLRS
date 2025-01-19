@@ -68,6 +68,7 @@ typedef enum
     CRSF_FRAMETYPE_OPENTX_SYNC = 0x10,
     CRSF_FRAMETYPE_RADIO_ID = 0x3A,
     CRSF_FRAMETYPE_RC_CHANNELS_PACKED = 0x16,
+    CRSF_FRAMETYPE_RC_CHANNELS_ENCRYPTED = 0x17,  // DONGHEE: Encrypted RC channels data
     CRSF_FRAMETYPE_ATTITUDE = 0x1E,
     CRSF_FRAMETYPE_FLIGHT_MODE = 0x21,
     // Extended Header Frames, range: 0x28 to 0x96
@@ -218,6 +219,22 @@ typedef struct rcPacket_s
     crsf_channels_s channels;
 } PACKED rcPacket_t;
 
+
+typedef struct crsf_channels_encrypted_s
+{
+  uint8_t packetType: 2,
+          free: 4,
+          isHighAux: 1, // true if chHigh are AUX6-10
+          ch4: 1;   // AUX1, included up here so ch0 starts on a byte boundary
+  uint8_t raw[10]; // ciphertext; 6 bytes (plaintext) + 4 bytes (LEA_ADD_PACKET_SIZE)
+} PACKED crsf_channels_encrypted_t;
+
+typedef struct rcPacketEncrypted_s
+{
+    crsf_header_t header;
+    crsf_channels_encrypted_s channels;
+} PACKED rcPacketEncrypted_t;
+
 typedef struct deviceInformationPacket_s
 {
     uint32_t serialNo;
@@ -287,6 +304,7 @@ union inBuffer_U
     uint8_t asUint8_t[CRSF_MAX_PACKET_LEN]; // max 64 bytes for CRSF packet serial buffer
     rcPacket_t asRCPacket_t;    // access the memory as RC data
                                 // add other packet types here
+    rcPacketEncrypted_t asRCPacketEncrypted_t; // access the memory as RC encrypted data
 };
 
 

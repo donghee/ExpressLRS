@@ -65,6 +65,8 @@ public:
      */
     virtual uint32_t sendRCFrame(bool frameAvailable, uint32_t *channelData) = 0;
 
+    virtual uint32_t sendRCFrameEncrypted(bool frameAvailable, uint8_t *channelDataEncrypted) = 0;
+
     /**
      * @brief send any previously queued data to the serial port stream `_outputPort`
      * member variable.

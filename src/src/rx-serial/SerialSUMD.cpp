@@ -78,3 +78,8 @@ uint32_t SerialSUMD::sendRCFrame(bool frameAvailable, uint32_t *channelData)
 
     return SUMD_CALLBACK_INTERVAL_MS;
 }
+
+uint32_t SerialSUMD::sendRCFrameEncrypted(bool frameAvailable, uint8_t *channelDataEncrypted)
+{
+    return DURATION_IMMEDIATELY;
+}

@@ -106,6 +106,13 @@ typedef struct {
             OTA_Channels_4x10 chHigh; // AUX2-5 or AUX6-9
         } PACKED rc;
         struct {
+            uint8_t packetType: 2,
+                    free: 4,
+                    isHighAux: 1, // true if chHigh are AUX6-9
+                    ch4: 1;   // AUX1, included up here so ch0 starts on a byte boundary
+            uint8_t raw[10];
+        } PACKED rc_encrypted;
+        struct {
             uint8_t packetType; // actually struct rc's first byte
             uint32_t packetNum; // LittleEndian
             uint8_t free[6];
