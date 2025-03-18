@@ -91,6 +91,7 @@ TxHandshakeClass TxHandshake;
 #endif
 HardwareSerial DebugSerial(USART1); // TX(PA9), RX(PA10)
 #endif
+volatile uint8_t COUNTER_4b = 0;
 volatile uint32_t msp_elapsedTime;
 volatile uint32_t dt;
 
@@ -586,17 +587,11 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
         otaPkt.full.rc.isHighAux = 0;
         otaPkt.full.rc.ch4 = CRSF_to_BIT(ChannelData[4]);
 
-        // ChannelDataEncrypted[1] = 0x09;
-        // ChannelDataEncrypted[2] = 0x08;
-        // ChannelDataEncrypted[3] = 0x07;
-        // ChannelDataEncrypted[4] = 0x06;
-        // ChannelDataEncrypted[5] = 0x05;
-        // ChannelDataEncrypted[6] = 0x04;
-        // ChannelDataEncrypted[7] = 0x03;
-        // ChannelDataEncrypted[8] = 0x02;
-        // ChannelDataEncrypted[9] = 0x01;
-        // ChannelDataEncrypted[10] = 0x00;
+        // 4 bits Packet Counter for Encrypted Channel Data to prevent replay attacks
+        COUNTER_4b = (COUNTER_4b + 1) % 16;
+        ChannelDataEncrypted[1] = (COUNTER_4b << 4) | (ChannelDataEncrypted[1] & 0x0F);
 
+        // If the channel data is encrypted, copy the channel data to the encrypted buffer
         memcpy(&otaPkt.full.rc_encrypted.raw, ChannelDataEncrypted+1, 10);
       }
     }

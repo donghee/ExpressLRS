@@ -13,3 +13,5 @@ windows:
         - vim src/rx_main.cpp
         - blackmagic -d /dev/ttyBmpGdbD5DDBEF5 # RX blackmagic probe
         - ./build.sh RX && ./debug.sh RX
+  - docs:
+    - vim ../docs/Development.md
