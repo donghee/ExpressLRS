@@ -257,3 +257,4 @@ bool isDualRadio();
 
 extern uint32_t ChannelData[CRSF_NUM_CHANNELS]; // Current state of channels, CRSF format
 extern uint8_t ChannelDataEncrypted[1+10]; // 1 byte for the packet type + 10 bytes for Encrypted channel data
+extern uint8_t securityType;

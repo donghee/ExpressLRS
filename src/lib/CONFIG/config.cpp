@@ -16,6 +16,8 @@
 #define BUTTON_CHANGED      bit(6)
 #define ALL_CHANGED         (MODEL_CHANGED | VTX_CHANGED | MAIN_CHANGED | FAN_CHANGED | MOTION_CHANGED | BUTTON_CHANGED)
 
+extern HardwareSerial DebugSerial;
+
 // Really awful but safe(?) type punning of model_config_t/v6_model_config_t to and from uint32_t
 template<class T> static const void U32_to_Model(uint32_t const u32, T * const model)
 {
@@ -376,6 +378,16 @@ TxConfig::SetTlm(uint8_t tlm)
     if (GetTlm() != tlm)
     {
         m_model->tlm = tlm;
+        m_modified |= MODEL_CHANGED;
+    }
+}
+
+void TxConfig::SetSecurity(uint8_t security)
+{
+    if (GetSecurity() != security)
+    {
+        // DebugSerial.printf("SetSecurity: %d\n", security);
+        m_model->_unused = security;
         m_modified |= MODEL_CHANGED;
     }
 }

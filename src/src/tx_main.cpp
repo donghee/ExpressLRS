@@ -581,18 +581,23 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
       {
         injectBackpackPanTiltRollData(now);
         OtaPackChannelData(&otaPkt, ChannelData, TelemetryReceiver.GetCurrentConfirm(), ExpressLRS_currTlmDenom);
-        otaPkt.full.rc.packetType = PACKET_TYPE_RCDATA;
-        otaPkt.full.rc.telemetryStatus = TelemetryReceiver.GetCurrentConfirm();
-        otaPkt.full.rc.uplinkPower = constrain(CRSF::LinkStatistics.uplink_TX_Power, 1, 8) - 1;
-        otaPkt.full.rc.isHighAux = 0;
-        otaPkt.full.rc.ch4 = CRSF_to_BIT(ChannelData[4]);
 
-        // 4 bits Packet Counter for Encrypted Channel Data to prevent replay attacks
-        COUNTER_4b = (COUNTER_4b + 1) % 16;
-        ChannelDataEncrypted[1] = (COUNTER_4b << 4) | (ChannelDataEncrypted[1] & 0x0F);
+        if (config.GetSecurity() != 0) { // 0 = no encryption, 1 = lea, 2 = ascon
+          otaPkt.full.rc_encrypted.packetType = PACKET_TYPE_RCDATA;
+          otaPkt.full.rc_encrypted.securityType = config.GetSecurity();
+          otaPkt.full.rc_encrypted.free = 0;
+          // otaPkt.full.rc.telemetryStatus = TelemetryReceiver.GetCurrentConfirm();
+          // otaPkt.full.rc_encrypted.uplinkPower = constrain(CRSF::LinkStatistics.uplink_TX_Power, 1, 8) - 1;
+          otaPkt.full.rc_encrypted.isHighAux = 0;
+          otaPkt.full.rc_encrypted.ch4 = CRSF_to_BIT(ChannelData[4]);
 
-        // If the channel data is encrypted, copy the channel data to the encrypted buffer
-        memcpy(&otaPkt.full.rc_encrypted.raw, ChannelDataEncrypted+1, 10);
+          // 4 bits Packet Counter for Encrypted Channel Data to prevent replay attacks
+          COUNTER_4b = (COUNTER_4b + 1) % 16;
+          ChannelDataEncrypted[1] = (COUNTER_4b << 4) | (ChannelDataEncrypted[1] & 0x0F);
+
+          // If the channel data is encrypted, copy the channel data to the encrypted buffer
+          memcpy(&otaPkt.full.rc_encrypted.raw, ChannelDataEncrypted+1, 10);
+        }
       }
     }
   }

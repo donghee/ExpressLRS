@@ -266,6 +266,13 @@ static struct luaItem_string luaBackpackVersion = {
     {"Version", CRSF_INFO},
     backpackVersion};
 
+//---------------------------- Security ------------------
+static struct luaItem_selection luaSecurity = {
+    {"Security", CRSF_TEXT_SELECTION},
+    1, // value
+    "Off;Lea;Ascon",
+    STR_EMPTYSPACE};
+
 //---------------------------- BACKPACK ------------------
 
 static char luaBadGoodString[10];
@@ -567,28 +574,32 @@ uint8_t adjustSwitchModeForAirRate(OtaSwitchMode_e eSwitchMode, uint8_t packetSi
 
 static void registerLuaParameters()
 {
+  registerLUAParameter(&luaSecurity, [](struct luaPropertiesCommon *item, uint8_t arg) {
+    config.SetSecurity(arg);
+  });
+
   if (HAS_RADIO) {
-    registerLUAParameter(&luaAirRate, [](struct luaPropertiesCommon *item, uint8_t arg) {
-    if (arg < RATE_MAX)
-    {
-      uint8_t selectedRate = RATE_MAX - 1 - arg;
-      uint8_t actualRate = adjustPacketRateForBaud(selectedRate);
-      uint8_t newSwitchMode = adjustSwitchModeForAirRate(
-        (OtaSwitchMode_e)config.GetSwitchMode(), get_elrs_airRateConfig(actualRate)->PayloadLength);
-      // If the switch mode is going to change, block the change while connected
-      if (newSwitchMode == OtaSwitchModeCurrent || connectionState == disconnected)
-      {
-        config.SetRate(actualRate);
-        config.SetSwitchMode(newSwitchMode);
-        if (actualRate != selectedRate)
-        {
-          setLuaWarningFlag(LUA_FLAG_ERROR_BAUDRATE, true);
-        }
-      }
-      else
-        setLuaWarningFlag(LUA_FLAG_ERROR_CONNECTED, true);
-    }
-    });
+    // registerLUAParameter(&luaAirRate, [](struct luaPropertiesCommon *item, uint8_t arg) {
+    // if (arg < RATE_MAX)
+    // {
+    //   uint8_t selectedRate = RATE_MAX - 1 - arg;
+    //   uint8_t actualRate = adjustPacketRateForBaud(selectedRate);
+    //   uint8_t newSwitchMode = adjustSwitchModeForAirRate(
+    //     (OtaSwitchMode_e)config.GetSwitchMode(), get_elrs_airRateConfig(actualRate)->PayloadLength);
+    //   // If the switch mode is going to change, block the change while connected
+    //   if (newSwitchMode == OtaSwitchModeCurrent || connectionState == disconnected)
+    //   {
+    //     config.SetRate(actualRate);
+    //     config.SetSwitchMode(newSwitchMode);
+    //     if (actualRate != selectedRate)
+    //     {
+    //       setLuaWarningFlag(LUA_FLAG_ERROR_BAUDRATE, true);
+    //     }
+    //   }
+    //   else
+    //     setLuaWarningFlag(LUA_FLAG_ERROR_CONNECTED, true);
+    // }
+    // });
     registerLUAParameter(&luaTlmRate, [](struct luaPropertiesCommon *item, uint8_t arg) {
       expresslrs_tlm_ratio_e eRatio = (expresslrs_tlm_ratio_e)arg;
       if (eRatio <= TLM_RATIO_DISARMED)
@@ -670,23 +681,23 @@ static void registerLuaParameters()
     registerLUAParameter(&luaCELimit, NULL, luaPowerFolder.common.id);
   }
 #endif
-  if ((HAS_RADIO || OPT_USE_TX_BACKPACK) && !firmwareOptions.is_airport) {
-    // VTX folder
-    registerLUAParameter(&luaVtxFolder);
-    registerLUAParameter(&luaVtxBand, [](struct luaPropertiesCommon *item, uint8_t arg) {
-      config.SetVtxBand(arg);
-    }, luaVtxFolder.common.id);
-    registerLUAParameter(&luaVtxChannel, [](struct luaPropertiesCommon *item, uint8_t arg) {
-      config.SetVtxChannel(arg - 1);
-    }, luaVtxFolder.common.id);
-    registerLUAParameter(&luaVtxPwr, [](struct luaPropertiesCommon *item, uint8_t arg) {
-      config.SetVtxPower(arg);
-    }, luaVtxFolder.common.id);
-    registerLUAParameter(&luaVtxPit, [](struct luaPropertiesCommon *item, uint8_t arg) {
-      config.SetVtxPitmode(arg);
-    }, luaVtxFolder.common.id);
-    registerLUAParameter(&luaVtxSend, &luahandSimpleSendCmd, luaVtxFolder.common.id);
-  }
+  // if ((HAS_RADIO || OPT_USE_TX_BACKPACK) && !firmwareOptions.is_airport) {
+  //   // VTX folder
+  //   registerLUAParameter(&luaVtxFolder);
+  //   registerLUAParameter(&luaVtxBand, [](struct luaPropertiesCommon *item, uint8_t arg) {
+  //     config.SetVtxBand(arg);
+  //   }, luaVtxFolder.common.id);
+  //   registerLUAParameter(&luaVtxChannel, [](struct luaPropertiesCommon *item, uint8_t arg) {
+  //     config.SetVtxChannel(arg - 1);
+  //   }, luaVtxFolder.common.id);
+  //   registerLUAParameter(&luaVtxPwr, [](struct luaPropertiesCommon *item, uint8_t arg) {
+  //     config.SetVtxPower(arg);
+  //   }, luaVtxFolder.common.id);
+  //   registerLUAParameter(&luaVtxPit, [](struct luaPropertiesCommon *item, uint8_t arg) {
+  //     config.SetVtxPitmode(arg);
+  //   }, luaVtxFolder.common.id);
+  //   registerLUAParameter(&luaVtxSend, &luahandSimpleSendCmd, luaVtxFolder.common.id);
+  // }
 
   // WIFI folder
   #if defined(PLATFORM_ESP32) || defined(PLATFORM_ESP8266)

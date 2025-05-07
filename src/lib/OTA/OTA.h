@@ -107,7 +107,8 @@ typedef struct {
         } PACKED rc;
         struct {
             uint8_t packetType: 2,
-                    free: 4,
+                    securityType: 2,
+                    free: 2,
                     isHighAux: 1, // true if chHigh are AUX6-9
                     ch4: 1;   // AUX1, included up here so ch0 starts on a byte boundary
             uint8_t raw[10];

@@ -100,6 +100,7 @@ public:
 
     // Getters
     uint8_t GetRate() const { return m_model->rate; }
+    uint8_t GetSecurity() const { return m_model->_unused; }
     uint8_t GetTlm() const { return m_model->tlm; }
     uint8_t GetPower() const { return m_model->power; }
     bool GetDynamicPower() const { return m_model->dynamicPower; }
@@ -127,6 +128,7 @@ public:
 
     // Setters
     void SetRate(uint8_t rate);
+    void SetSecurity(uint8_t security);
     void SetTlm(uint8_t tlm);
     void SetPower(uint8_t power);
     void SetDynamicPower(bool dynamicPower);

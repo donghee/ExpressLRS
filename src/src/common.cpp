@@ -113,6 +113,7 @@ bool connectionHasModelMatch;
 
 uint32_t ChannelData[CRSF_NUM_CHANNELS];      // Current state of channels, CRSF format
 uint8_t ChannelDataEncrypted[1+10]; // 1 byte for the packet type + 10 bytes for Encrypted channel data
+uint8_t securityType = 0;
 
 uint8_t MasterUID[6];                       // The definitive user UID
 uint8_t UID[6];                             // The currently running UID

@@ -15,3 +15,5 @@ windows:
         - ./build.sh RX && ./debug.sh RX
   - docs:
     - vim ../docs/Development.md
+  - lazygit:
+    - lazygit
