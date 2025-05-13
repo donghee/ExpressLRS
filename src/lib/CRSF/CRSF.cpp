@@ -400,12 +400,14 @@ bool ICACHE_RAM_ATTR CRSF::ProcessPacket()
         CRSF::RCdataLastRecv = micros();
         RcPacketToChannelsData();
         packetReceived = true;
+        securityType = 0;
     }
     else if (packetType == CRSF_FRAMETYPE_RC_CHANNELS_ENCRYPTED)
     {
         CRSF::RCdataLastRecv = micros();
         RcPacketToChannelsEncryptedData();
         packetReceived = true;
+        securityType = 1;
     }
     // check for all extended frames that are a broadcast or a message to the FC
     else if (packetType >= CRSF_FRAMETYPE_DEVICE_PING &&

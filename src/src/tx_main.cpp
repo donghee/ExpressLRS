@@ -582,9 +582,9 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
         injectBackpackPanTiltRollData(now);
         OtaPackChannelData(&otaPkt, ChannelData, TelemetryReceiver.GetCurrentConfirm(), ExpressLRS_currTlmDenom);
 
-        if (config.GetSecurity() != 0) { // 0 = no encryption, 1 = lea, 2 = ascon
+        if (securityType != 0) { // 0 = no encryption, 1 = lea, 2 = ascon
           otaPkt.full.rc_encrypted.packetType = PACKET_TYPE_RCDATA;
-          otaPkt.full.rc_encrypted.securityType = config.GetSecurity();
+          otaPkt.full.rc_encrypted.securityType = securityType;
           otaPkt.full.rc_encrypted.free = 0;
           // otaPkt.full.rc.telemetryStatus = TelemetryReceiver.GetCurrentConfirm();
           // otaPkt.full.rc_encrypted.uplinkPower = constrain(CRSF::LinkStatistics.uplink_TX_Power, 1, 8) - 1;
