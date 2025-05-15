@@ -269,7 +269,7 @@ static struct luaItem_string luaBackpackVersion = {
 //---------------------------- Security ------------------
 static struct luaItem_selection luaSecurity = {
     {"Crypto", CRSF_TEXT_SELECTION},
-    1, // value
+    0, // value
     "Off;LEA-GCM;ASCON",
     STR_EMPTYSPACE};
 
@@ -790,6 +790,7 @@ static int event()
   {
     return DURATION_NEVER;
   }
+  setLuaTextSelectionValue(&luaSecurity, config.GetSecurity());
   uint8_t currentRate = adjustPacketRateForBaud(config.GetRate());
   setLuaTextSelectionValue(&luaAirRate, RATE_MAX - 1 - currentRate);
   setLuaTextSelectionValue(&luaTlmRate, config.GetTlm());
