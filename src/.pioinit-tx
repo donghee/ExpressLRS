@@ -1,3 +1,5 @@
+set pagination off
+
 file .pio/build/LEA_2400_TX_via_STLINK/firmware.elf
 # openocd or jlink: sudo openocd
 #target extended-remote :2331

@@ -393,6 +393,7 @@ bool ICACHE_RAM_ATTR CRSF::ProcessPacket()
     }
 
     const uint8_t packetType = CRSF::inBuffer.asRCPacket_t.header.type;
+    const uint8_t securityType_ = CRSF::inBuffer.asRCPacketEncrypted_t.channels.securityType;
     uint8_t *SerialInBuffer = CRSF::inBuffer.asUint8_t;
 
     if (packetType == CRSF_FRAMETYPE_RC_CHANNELS_PACKED)
@@ -407,7 +408,7 @@ bool ICACHE_RAM_ATTR CRSF::ProcessPacket()
         CRSF::RCdataLastRecv = micros();
         RcPacketToChannelsEncryptedData();
         packetReceived = true;
-        securityType = 1;
+        securityType = securityType_;
     }
     // check for all extended frames that are a broadcast or a message to the FC
     else if (packetType >= CRSF_FRAMETYPE_DEVICE_PING &&

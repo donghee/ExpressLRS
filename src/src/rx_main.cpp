@@ -892,10 +892,10 @@ static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPkt
 
     // if secure link is enabled
     bool telemetryConfirmValue = false;
-    if (otaPktPtr->full.rc_encrypted.securityType == 1 && otaPktPtr->full.rc_encrypted.free == 0 && otaPktPtr->full.rc_encrypted.isHighAux == 0)
+    if (otaPktPtr->full.rc_encrypted.securityType >= 1 && otaPktPtr->full.rc_encrypted.free == 0 && otaPktPtr->full.rc_encrypted.isHighAux == 0)
     {
         telemetryConfirmValue = UnpackChannelDataEncrypted(otaPktPtr, ChannelDataEncrypted, ExpressLRS_currTlmDenom);
-        securityType = 1;
+        securityType = otaPktPtr->full.rc_encrypted.securityType;
     }
     else
     {

@@ -223,7 +223,8 @@ typedef struct rcPacket_s
 typedef struct crsf_channels_encrypted_s
 {
   uint8_t packetType: 2,
-          free: 4,
+          securityType: 2,
+          free: 2,
           isHighAux: 1, // true if chHigh are AUX6-10
           ch4: 1;   // AUX1, included up here so ch0 starts on a byte boundary
   uint8_t raw[10]; // ciphertext; 6 bytes (plaintext) + 4 bytes (LEA_ADD_PACKET_SIZE)

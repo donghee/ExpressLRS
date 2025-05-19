@@ -40,7 +40,7 @@ static int timeout()
     // only send frames if we have a model match
     if (connectionHasModelMatch)
     {
-        if (securityType == 1)
+        if (securityType >= 1)
         {
             duration = serialIO->sendRCFrameEncrypted(frameAvailable, ChannelDataEncrypted);
         }
