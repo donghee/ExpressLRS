@@ -10,6 +10,13 @@ case "$1" in
 	"RX")
     gdb-multiarch -x .pioinit-rx
     ;;
+  "AIO_TX")
+    gdb-multiarch -x .pioinit-aio-tx
+    ;;
+	"AIO_RX")
+    gdb-multiarch -x .pioinit-aio-rx
+    ;;
+
 	 *)
      echo "TX or RX"
      exit 1
