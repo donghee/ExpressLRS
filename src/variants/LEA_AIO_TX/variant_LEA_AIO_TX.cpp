@@ -62,9 +62,89 @@ const PinName digitalPin[] = {
   PC_13,  // D45
   PC_14,  // D46
   PC_15,  // D47
-  PD_2,   // D48
-  PH_0,   // D49
-  PH_1    // D50
+  PD_0,   // D48
+  PD_1,   // D49
+  PD_2,   // D50
+  PD_3,   // D51
+  PD_4,   // D52
+  PD_5,   // D53
+  PD_6,   // D54
+  PD_7,   // D55
+  PD_8,   // D56
+  PD_9,   // D57
+  PD_10,  // D58
+  PD_11,  // D59
+  PD_12,  // D60
+  PD_13,  // D61
+  PD_14,  // D62
+  PD_15,  // D63
+  PE_0,   // D64
+  PE_1,   // D65
+  PE_2,   // D66
+  PE_3,   // D67
+  PE_4,   // D68
+  PE_5,   // D69
+  PE_6,   // D70
+  PE_7,   // D71
+  PE_8,   // D72
+  PE_9,   // D73
+  PE_10,  // D74
+  PE_11,  // D75
+  PE_12,  // D76
+  PE_13,  // D77
+  PE_14,  // D78
+  PE_15,  // D79
+  PF_0,   // D80
+  PF_1,   // D81
+  PF_2,   // D82
+  PF_3,   // D83/A16
+  PF_4,   // D84/A17
+  PF_5,   // D85/A18
+  PF_6,   // D86/A19
+  PF_7,   // D87/A20
+  PF_8,   // D88/A21
+  PF_9,   // D89/A22
+  PF_10,  // D90/A23
+  PF_11,  // D91
+  PF_12,  // D92
+  PF_13,  // D93
+  PF_14,  // D94
+  PF_15,  // D95
+  PG_0,   // D96
+  PG_1,   // D97
+  PG_2,   // D98
+  PG_3,   // D99
+  PG_4,   // D100
+  PG_5,   // D101
+  PG_6,   // D102
+  PG_7,   // D103
+  PG_8,   // D104
+  PG_9,   // D105
+  PG_10,  // D106
+  PG_11,  // D107
+  PG_12,  // D108
+  PG_13,  // D109
+  PG_14,  // D110
+  PG_15,  // D111
+  PH_0,   // D112
+  PH_1,   // D113
+  PH_2,   // D114
+  PH_3,   // D115
+  PH_4,   // D116
+  PH_5,   // D117
+  PH_6,   // D118
+  PH_7,   // D119
+  PI_0,   // D120
+  PI_1,   // D121
+  PI_3,   // D122
+  PI_4,   // D123
+  PI_5,   // D124
+  PI_6,   // D125
+  PI_7,   // D126
+  PI_8,   // D127
+  PI_9,   // D128
+  PI_10,  // D129
+  PI_11   // D130
 };
 
 // Analog (Ax) pin number array
@@ -84,7 +164,15 @@ const uint32_t analogInputPin[] = {
   34, // A12, PC2
   35, // A13, PC3
   36, // A14, PC4
-  37  // A15, PC5
+  37, // A15, PC5
+  83, // A16, PF3
+  84, // A17, PF4
+  85, // A18, PF5
+  86, // A19, PF6
+  87, // A20, PF7
+  88, // A21, PF8
+  89, // A22, PF9
+  90  // A23, PF10
 };
 
 // ----------------------------------------------------------------------------
@@ -100,45 +188,44 @@ extern "C" {
   */
 WEAK void SystemClock_Config(void)
 {
-  RCC_OscInitTypeDef RCC_OscInitStruct = {};
-  RCC_ClkInitTypeDef RCC_ClkInitStruct = {};
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-  /**Configure the main internal regulator output voltage
+  /** Configure the main internal regulator output voltage
   */
   __HAL_RCC_PWR_CLK_ENABLE();
-
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
 
-  /**Initializes the CPU, AHB and APB busses clocks
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
   */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 6;
+  RCC_OscInitStruct.PLL.PLLM = 8;
   RCC_OscInitStruct.PLL.PLLN = 168;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
-  RCC_OscInitStruct.PLL.PLLQ = 7;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+  RCC_OscInitStruct.PLL.PLLQ = 4;
+  RCC_OscInitStruct.PLL.PLLR = 2;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
     Error_Handler();
   }
 
-  /**Initializes the CPU, AHB and APB busses clocks
+  /** Initializes the CPU, AHB and APB buses clocks
   */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK
-                                | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV4;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV8;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK) {
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
+  {
     Error_Handler();
   }
-
-  /* Ensure CCM RAM clock is enabled */
-  __HAL_RCC_CCMDATARAMEN_CLK_ENABLE();
-
 }
 
 #ifdef __cplusplus
