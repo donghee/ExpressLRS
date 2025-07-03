@@ -61,3 +61,63 @@ For an exhaustive list of hardware targets and their user guides, check out the 
 If you are a developer and would like to contribute to the project, feel free to join the [discord](https://discord.gg/expresslrs) and chat about bugs and issues. You can also look for issues at the [GitHub Issue Tracker](https://github.com/ExpressLRS/ExpressLRS/issues). The best thing to do is to submit a Pull Request to the GitHub Repository. 
 
 ![](https://github.com/ExpressLRS/ExpressLRS-Hardware/blob/master/img/community.png?raw=true)
+
+---
+
+# 일체형 TX/RX ExpressLRS 펌웨어 빌드 방법 
+
+## 1. 개발 환경 설치 
+
+1. 개발에 필요한 라이브러리와 컴파일러 설치 
+
+```sh
+make setup
+```
+
+2. 도커 이미지 빌드
+
+```sh
+make build-docker-image
+```
+
+## 2. 개발 환경 컨테이너 실행
+
+도커 컨테이너 실행. (빌드 하기전에 실행 해두어야 함.)
+
+```sh
+make run-docker-container
+```
+
+## 3. 펌웨어 빌드
+
+일체형 TX 펌웨어 빌드
+```sh
+make build-aio-tx
+```
+
+일체형 RX 펌웨어 빌드
+```sh
+make build-aio-rx
+```
+
+## 4. 펌웨어 업로드
+
+펌웨어 빌드를 하면 다음 위치에 펌웨어 파일이 생긴다.
+
+```
+.pio/build/LEA_2400_AIO_TX_via_STLINK/firmware.elf
+.pio/build/LEA_2400_AIO_RX_via_STLINK/firmware.elf
+```
+
+일체형 TX 펌웨어 업로드
+```sh
+make debug-aio-tx
+```
+
+일체형 RX 펌웨어 업로드
+```sh
+make debug-aio-rx
+```
+
+
+STM MCU 프로그래머stlink v3을 이용해서 펌웨어를 타겟 보드에 올린다.
