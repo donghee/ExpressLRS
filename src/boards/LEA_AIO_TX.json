@@ -4,7 +4,7 @@
     "cpu": "cortex-m4",
     "extra_flags": "-DSTM32F4xx -DSTM32F479xx",
     "f_cpu": "180000000L",
-	  "ldscript": "ldscript.ld",
+    "ldscript": "variants/LEA_AIO_TX/ldscript.ld",
     "mcu": "stm32f479iihx",
     "product_line": "STM32F479xx",
   	"variants_dir": "variants",

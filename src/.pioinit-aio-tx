@@ -3,7 +3,7 @@ set pagination off
 file .pio/build/LEA_2400_AIO_TX_via_STLINK/firmware.elf
 # openocd or jlink: sudo openocd
 #target extended-remote :2331
-# pyocd: pyocd gdbserver --persist -t stm32f405rgtx -u 005100303232511739353236 -p 3333 -T 4444 # TX STLINK-V3
+# pyocd: pyocd gdbserver --persist -t stm32f479iihx -u 003800423433510837363934 -p 3333 -T 4444 # AIO TX STLINK-V3
 target extended-remote :3333
 
 # enabling access to memory mapped IO
