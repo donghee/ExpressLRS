@@ -236,7 +236,7 @@ RxHandshakeClass RxHandshake;
 #endif
 HardwareSerial DebugSerial(USART2); // TX(PA2), RX(PA3)
 #endif
-HardwareSerial DebugSerial(USART2); // TX(PA2), RX(PA3)
+HardwareSerial DebugSerial(UART4); // AIO RX UART4 (PC10), RX(PC11)
 
 void reset_into_bootloader(void);
 void EnterBindingMode();
