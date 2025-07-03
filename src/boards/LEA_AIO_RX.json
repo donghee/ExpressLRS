@@ -1,0 +1,40 @@
+{
+  "build": {
+    "core": "stm32",
+    "cpu": "cortex-m4",
+    "extra_flags": "-DSTM32F4xx -DSTM32F479xx",
+    "f_cpu": "180000000L",
+    "ldscript": "variants/LEA_AIO_RX/ldscript.ld",
+    "mcu": "stm32f479iihx",
+    "product_line": "STM32F479xx",
+  	"variants_dir": "variants",
+    "variant": "LEA_AIO_RX"
+  },
+  "connectivity": [
+    "can"
+  ],
+  "debug": {
+    "jlink_device": "STM32F479hx",
+    "openocd_target": "stm32f4x",
+    "svd_path": "STM32F46_79x.svd"
+  },
+  "frameworks": [
+    "arduino",
+    "cmsis",
+    "stm32cube",
+    "libopencm3"
+  ],
+  "name": "LEA AIO RX",
+  "upload": {
+    "maximum_ram_size": 327680,
+    "maximum_size": 2097152,
+    "protocol": "stlink",
+    "protocols": [
+      "jlink",
+      "stlink",
+      "blackmagic"
+    ]
+  },
+  "url": "https://www.etri.re.kr",
+  "vendor": "ETRI"
+}

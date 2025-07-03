@@ -1,0 +1,13 @@
+set pagination off
+
+file .pio/build/LEA_2400_AIO_RX_via_STLINK/firmware.elf
+# openocd or jlink: sudo openocd
+#target extended-remote :2331
+# pyocd: pyocd gdbserver --persist -t stm32f479iihx -u 004400353133510537363734 -p 3334 -T 4445 # AIO RX STLINK-V3
+target extended-remote :3334
+
+# enabling access to memory mapped IO
+set mem inaccessible-by-default off
+load .pio/build/LEA_2400_AIO_RX_via_STLINK/firmware.elf
+#monitor reset
+c
