@@ -1,0 +1,33 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug ExpressLRS AIO TX",
+            "cwd": "${workspaceFolder}/src",
+            "executable": "${workspaceFolder}/src/.pio/build/LEA_2400_AIO_TX_via_STLINK/firmware.elf",
+            "request": "launch",
+            "type": "cortex-debug",
+            //"runToEntryPoint": "setup",
+            "showDevDebugOutput": "raw",
+            "servertype": "pyocd",
+            "serverArgs": [
+                "--target", "stm32f479iihx",
+            ],
+            "gdbPath": "/usr/bin/gdb-multiarch",
+        },
+        {
+            "name": "Debug ExpressLRS AIO RX",
+            "cwd": "${workspaceFolder}/src",
+            "executable": "${workspaceFolder}/src/.pio/build/LEA_2400_AIO_RX_via_STLINK/firmware.elf",
+            "request": "launch",
+            "type": "cortex-debug",
+            //"runToEntryPoint": "setup",
+            "showDevDebugOutput": "raw",
+            "servertype": "pyocd",
+            "serverArgs": [
+                "--target", "stm32f479iihx",
+            ],
+            "gdbPath": "/usr/bin/gdb-multiarch",
+        }
+    ]
+}
