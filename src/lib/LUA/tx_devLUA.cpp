@@ -579,27 +579,27 @@ static void registerLuaParameters()
   });
 
   if (HAS_RADIO) {
-    // registerLUAParameter(&luaAirRate, [](struct luaPropertiesCommon *item, uint8_t arg) {
-    // if (arg < RATE_MAX)
-    // {
-    //   uint8_t selectedRate = RATE_MAX - 1 - arg;
-    //   uint8_t actualRate = adjustPacketRateForBaud(selectedRate);
-    //   uint8_t newSwitchMode = adjustSwitchModeForAirRate(
-    //     (OtaSwitchMode_e)config.GetSwitchMode(), get_elrs_airRateConfig(actualRate)->PayloadLength);
-    //   // If the switch mode is going to change, block the change while connected
-    //   if (newSwitchMode == OtaSwitchModeCurrent || connectionState == disconnected)
-    //   {
-    //     config.SetRate(actualRate);
-    //     config.SetSwitchMode(newSwitchMode);
-    //     if (actualRate != selectedRate)
-    //     {
-    //       setLuaWarningFlag(LUA_FLAG_ERROR_BAUDRATE, true);
-    //     }
-    //   }
-    //   else
-    //     setLuaWarningFlag(LUA_FLAG_ERROR_CONNECTED, true);
-    // }
-    // });
+    registerLUAParameter(&luaAirRate, [](struct luaPropertiesCommon *item, uint8_t arg) {
+    if (arg < RATE_MAX)
+    {
+      uint8_t selectedRate = RATE_MAX - 1 - arg;
+      uint8_t actualRate = adjustPacketRateForBaud(selectedRate);
+      uint8_t newSwitchMode = adjustSwitchModeForAirRate(
+        (OtaSwitchMode_e)config.GetSwitchMode(), get_elrs_airRateConfig(actualRate)->PayloadLength);
+      // If the switch mode is going to change, block the change while connected
+      if (newSwitchMode == OtaSwitchModeCurrent || connectionState == disconnected)
+      {
+        config.SetRate(actualRate);
+        config.SetSwitchMode(newSwitchMode);
+        if (actualRate != selectedRate)
+        {
+          setLuaWarningFlag(LUA_FLAG_ERROR_BAUDRATE, true);
+        }
+      }
+      else
+        setLuaWarningFlag(LUA_FLAG_ERROR_CONNECTED, true);
+    }
+    });
     registerLUAParameter(&luaTlmRate, [](struct luaPropertiesCommon *item, uint8_t arg) {
       expresslrs_tlm_ratio_e eRatio = (expresslrs_tlm_ratio_e)arg;
       if (eRatio <= TLM_RATIO_DISARMED)
