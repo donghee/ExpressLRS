@@ -17,7 +17,7 @@ setup: build-docker-image
 
 prebuild:
 	sudo chown -R `id -un` src/.pio/build
-	# git pull --rebase --autostash
+	git pull --rebase --autostash
 	
 build-tx: prebuild
 	cd src; ./mbedtls_patch.sh; pio run -t clean -e LEA_2400_TX_via_STLINK && pio debug -e LEA_2400_TX_via_STLINK
@@ -39,9 +39,11 @@ build: build-tx build-rx build-aio-tx build-aio-rx
 	@echo 'Successfully built ExpressLRS TX and RX firmwares'
 
 debug-aio-tx: build-aio-tx
-	@echo 'pyocd gdbserver --persist -t stm32f479iihx -u 003800423433510837363934 -p 3333 -T 4444 # AIO TX STLINK-V3'
+	# Before execution, PyOCD needs to be run. When running PyOCD, it's necessary to select a hardware debugger.
+	@echo 'pyocd gdbserver --persist -t stm32f479iihx -p 3333 -T 4444 # AIO TX STLINK-V3'
 	cd src; gdb-multiarch -x .pioinit-aio-tx
 
 debug-aio-rx: build-aio-rx
-	@echo 'pyocd gdbserver --persist -t stm32f479iihx -u 004400353133510537363734 -p 3334 -T 4445 # AIO RX STLINK-V3'
+	# Before execution, PyOCD needs to be run. When running PyOCD, it's necessary to select a hardware debugger.
+	@echo 'pyocd gdbserver --persist -t stm32f479iihx -p 3334 -T 4445 # AIO RX STLINK-V3'
 	cd src; gdb-multiarch -x .pioinit-aio-rx
