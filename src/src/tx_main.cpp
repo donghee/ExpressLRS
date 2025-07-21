@@ -89,9 +89,13 @@ volatile unsigned int lea_samples = 0;
 #if defined(USE_LEA_KEY_EXCHANGE)
 TxHandshakeClass TxHandshake;
 #endif
-HardwareSerial DebugSerial(USART1); // TX(PA9), RX(PA10)
 #endif
+
+#if defined(TARGET_TX_LEA)
+HardwareSerial DebugSerial(USART1); // TX(PA9), RX(PA10)
+#elif defined(TARGET_AIO_TX_LEA)
 HardwareSerial DebugSerial(UART4); // AIO TX UART4 (PC10), RX(PC11)
+#endif
 
 volatile uint8_t COUNTER_4b = 0;
 volatile uint32_t msp_elapsedTime;
@@ -1284,14 +1288,11 @@ static void setupSerial()
   UNUSED(txPin);
 #endif
 
-#if defined(USE_LEA)
+#if defined(TARGET_TX_LEA) || defined(TARGET_AIO_TX_LEA)
   DebugSerial.setRx(GPIO_PIN_DEBUG_RX);
   DebugSerial.setTx(GPIO_PIN_DEBUG_TX);
   DebugSerial.begin(420000);
 #endif
-  DebugSerial.setRx(GPIO_PIN_DEBUG_RX);
-  DebugSerial.setTx(GPIO_PIN_DEBUG_TX);
-  DebugSerial.begin(420000);
 }
 
 /**

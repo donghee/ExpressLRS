@@ -234,9 +234,13 @@ volatile unsigned int lea_samples = 0;
 #if defined(USE_LEA_KEY_EXCHANGE)
 RxHandshakeClass RxHandshake;
 #endif
-HardwareSerial DebugSerial(USART2); // TX(PA2), RX(PA3)
 #endif
+
+#if defined(TARGET_RX_LEA)
+HardwareSerial DebugSerial(USART2); // TX(PA2), RX(PA3)
+#elif defined(TARGET_AIO_RX_LEA)
 HardwareSerial DebugSerial(UART4); // AIO RX UART4 (PC10), RX(PC11)
+#endif
 
 void reset_into_bootloader(void);
 void EnterBindingMode();
@@ -1446,15 +1450,11 @@ static void setupSerial()
     SerialLogger = &Serial;
 #endif
 
-#if defined(USE_LEA)
+#if defined(TARGET_RX_LEA) || defined(TARGET_AIO_RX_LEA)
   DebugSerial.setRx(GPIO_PIN_DEBUG_RX);
   DebugSerial.setTx(GPIO_PIN_DEBUG_TX);
   DebugSerial.begin(420000);
 #endif
-  DebugSerial.setRx(GPIO_PIN_DEBUG_RX);
-  DebugSerial.setTx(GPIO_PIN_DEBUG_TX);
-  DebugSerial.begin(420000);
-#
 }
 
 static void serialShutdown()
