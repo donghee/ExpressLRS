@@ -1,5 +1,6 @@
 #pragma once
 
+#include "OTA.h"
 #include <cstdint>
 
 extern "C"
@@ -7,6 +8,12 @@ extern "C"
 #include "ascon128x.h"
 #include <stddef.h>
 }
+
+// Measurement of lea encryption and decryption time
+#define  ARM_CM_DEMCR      (*(uint32_t *)0xE000EDFC)
+#define  ARM_CM_DWT_CTRL   (*(uint32_t *)0xE0001000)
+#define  ARM_CM_DWT_CYCCNT (*(uint32_t *)0xE0001004)
+
 
 class Ascon128 {
 private:
@@ -30,6 +37,10 @@ private:
     uint8_t COUNTER_4b_new;
     uint8_t COUNTER_4b_gap;
 
+    // Measurement of lea encryption and decryption time
+    uint32_t  start[3];
+    uint32_t  stop[3];
+    uint32_t  delta[3];
 
 public:
   Ascon128();
@@ -46,5 +57,14 @@ public:
 
   int encrypt(const uint8_t *plaintext, int plaintext_len, uint8_t *ciphertext); // plaintext to data
   int decrypt(const uint8_t *ciphertext, uint8_t ciphertext_len, uint8_t *plaintext); // ciphertext ->  plaintext
+
+  int encrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen); // otaPktPtr -> data
+  int decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen); // data --> otaPktPtr
+
+    int counter() { return COUNTER_RX; };
+
+    // Measurement of lea encryption and decryption time
+    uint32_t encryption_time();
+    uint32_t decryption_time();
 };
 

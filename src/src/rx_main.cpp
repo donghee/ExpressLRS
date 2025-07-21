@@ -36,6 +36,7 @@
 #include "devBaro.h"
 #include "devMSPVTX.h"
 #include "gcm.h"
+#include "ascon128.h"
 #include "rx_handshake.h"
 
 #if defined(PLATFORM_ESP8266)
@@ -226,6 +227,7 @@ static unsigned long loadBindingStartedMs = 0;
 
 #if defined(USE_LEA)
 GCM lea_gcm;
+Ascon128 ascon;
 volatile unsigned long lea_elapsedTime;
 volatile unsigned long lea_processTime = 0;
 volatile uint32_t long lea_processTicks = 0;
@@ -235,6 +237,7 @@ volatile unsigned int lea_samples = 0;
 RxHandshakeClass RxHandshake;
 #endif
 #endif
+
 
 #if defined(TARGET_RX_LEA)
 HardwareSerial DebugSerial(USART2); // TX(PA2), RX(PA3)
@@ -540,8 +543,11 @@ bool ICACHE_RAM_ATTR HandleSendTelemetryResponse()
     }
 
 #if defined(USE_LEA)
+    int ret = 0;
     uint8_t ciphertext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = { 0 };
-    if (lea_gcm.encrypt(&otaPkt, ciphertext, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE) != 0)
+    // ret = lea_gcm.encrypt(&otaPkt, ciphertext, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
+    ret = ascon.encrypt(&otaPkt, ciphertext, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
+    if (ret == -1)
     {
       DBGLN("LEA GCM encrypt error");
       return false;
@@ -1077,9 +1083,11 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
 
     // decrypt the packet
     lea_elapsedTime = micros();
-    ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
+    // ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
+    ret = ascon.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
     lea_processTime += micros() - lea_elapsedTime;
-    lea_processTicks += lea_gcm.decryption_time();
+    // lea_processTicks += lea_gcm.decryption_time();
+    lea_processTicks += ascon.decryption_time();
     lea_samples++;
     if (lea_samples == 100) {
         DebugSerial.print("RX average time of decryption: ");
@@ -1092,7 +1100,7 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
         lea_processTime = 0;
         lea_processTicks = 0;
     }
-    if (ret != 0)
+    if (ret == -1)
     {
         DBGLN("LEA GCM decrypt error");
         return false;
@@ -1925,6 +1933,7 @@ void setup()
 
 #if defined(USE_LEA)
         lea_gcm.init();
+        ascon.init();
 #endif
     }
 
