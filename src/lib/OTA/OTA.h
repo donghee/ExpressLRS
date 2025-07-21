@@ -180,9 +180,12 @@ extern GeneratePacketCrc_t OtaGeneratePacketCrc;
 #define ELRS_CRC14_POLY 0x2E57 // 0x372b
 #define ELRS_CRC16_POLY 0x3D65 // 0x9eb2
 
+void printChannelData_AIO(uint32_t *ChannelData);
+
 #if defined(TARGET_TX) || defined(UNIT_TEST)
 typedef void (*PackChannelData_t)(OTA_Packet_s * const otaPktPtr, const uint32_t *channelData, bool TelemetryStatus, uint8_t tlmDenom);
 extern PackChannelData_t OtaPackChannelData;
+void OtaPackChannelData_RCDATA_AIO(uint8_t * rcdata, const uint32_t *channelData, bool telemetryStatus, uint8_t tlmDenom, uint8_t isHighAux);
 #if defined(UNIT_TEST)
 void OtaSetHybrid8NextSwitchIndex(uint8_t idx);
 void OtaSetFullResNextChannelSet(bool next);
@@ -192,6 +195,7 @@ void OtaSetFullResNextChannelSet(bool next);
 #if defined(TARGET_RX) || defined(UNIT_TEST)
 typedef bool (*UnpackChannelData_t)(OTA_Packet_s const * const otaPktPtr, uint32_t *channelData, uint8_t tlmDenom);
 extern UnpackChannelData_t OtaUnpackChannelData;
+bool ICACHE_RAM_ATTR OtaUnpackChannelData_RCDATA_AIO(OTA_Packet_s const * const otaPktPtr, uint32_t *channelData, uint8_t const tlmDenom);
 #endif
 
 void OtaPackAirportData(OTA_Packet_s * const otaPktPtr, FIFO<AP_MAX_BUF_LEN> *inputBuffer);

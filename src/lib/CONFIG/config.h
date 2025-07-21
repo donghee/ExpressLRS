@@ -222,6 +222,7 @@ public:
     void Commit();
 
     // Getters
+    uint8_t GetSecurity() const { return m_config.unused; }
     bool     GetIsBound() const { return firmwareOptions.hasUID || m_config.isBound; }
     const uint8_t* GetUID() const { return m_config.uid; }
     bool GetOnLoan() const { return m_config.onLoan; }
@@ -240,6 +241,7 @@ public:
     eFailsafeMode GetFailsafeMode() const { return (eFailsafeMode)m_config.failsafeMode; }
 
     // Setters
+    void SetSecurity(uint8_t security);
     void SetIsBound(bool isBound);
     void SetUID(uint8_t* uid);
     void SetOnLoan(bool loaned);

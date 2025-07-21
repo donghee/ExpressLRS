@@ -36,7 +36,8 @@
 #include "devBaro.h"
 #include "devMSPVTX.h"
 #include "gcm.h"
-#include "rx_handshake.h"
+#include "ascon128.h"
+#include "rx_handshake_ecdh.h"
 
 #if defined(PLATFORM_ESP8266)
 #include <user_interface.h>
@@ -224,19 +225,28 @@ bool returnModelFromLoan = false;
 static unsigned long loanBindTimeout = LOAN_BIND_TIMEOUT_DEFAULT;
 static unsigned long loadBindingStartedMs = 0;
 
-#if defined(USE_LEA)
+#if defined(USE_CRYPTO)
 GCM lea_gcm;
-volatile unsigned long lea_elapsedTime;
-volatile unsigned long lea_processTime = 0;
-volatile uint32_t long lea_processTicks = 0;
-volatile uint32_t long lea_processTicks_ = 0;
-volatile unsigned int lea_samples = 0;
-#if defined(USE_LEA_KEY_EXCHANGE)
+Ascon128 ascon;
+Crypto* crypto = nullptr;
+
+volatile unsigned long crypto_elapsedTime;
+volatile unsigned long crypto_processTime = 0;
+volatile uint32_t long crypto_processTicks = 0;
+volatile unsigned int crypto_samples = 0;
+
+ECDH rxEcdh;
+#if defined(USE_CRYPTO_KEY_EXCHANGE)
 RxHandshakeClass RxHandshake;
 #endif
-HardwareSerial DebugSerial(USART2); // TX(PA2), RX(PA3)
 #endif
+
+
+#if defined(TARGET_RX_LEA)
+HardwareSerial DebugSerial(USART2); // TX(PA2), RX(PA3)
+#elif defined(TARGET_AIO_RX_LEA)
 HardwareSerial DebugSerial(UART4); // AIO RX UART4 (PC10), RX(PC11)
+#endif
 
 void reset_into_bootloader(void);
 void EnterBindingMode();
@@ -349,13 +359,13 @@ void SetRFLinkRate(uint8_t index) // Set speed of RF link
 #if defined(DEBUG_FREQ_CORRECTION) && defined(RADIO_SX128X)
     interval = interval * 12 / 10; // increase the packet interval by 20% to allow adding packet header
 #endif
-#if defined(USE_LEA) && defined(RADIO_SX128X)
-    interval = interval * 14.5 / 10; // increase the packet interval by 35% to allow adding lea packet header
+#if defined(USE_CRYPTO) && defined(RADIO_SX128X)
+    interval = interval * 13.75 / 10; // increase the packet interval by 35% to allow adding lea packet header
                                      // Why 45%? It is as follows. addtional lea packet is more than 30%, so add 40% to the original interval.
 #endif
     hwTimer::updateInterval(interval);
     Radio.Config(ModParams->bw, ModParams->sf, ModParams->cr, GetInitialFreq(),
-#if defined(USE_LEA)
+#if defined(USE_CRYPTO)
                  ModParams->PreambleLen, invertIQ, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE, 0
 #else
                  ModParams->PreambleLen, invertIQ, ModParams->PayloadLength, 0
@@ -535,19 +545,7 @@ bool ICACHE_RAM_ATTR HandleSendTelemetryResponse()
         transmittingRadio = SX12XX_Radio_NONE;
     }
 
-#if defined(USE_LEA)
-    uint8_t ciphertext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = { 0 };
-    if (lea_gcm.encrypt(&otaPkt, ciphertext, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE) != 0)
-    {
-      DBGLN("LEA GCM encrypt error");
-      return false;
-    }
-
-    Radio.TXnb(ciphertext, sizeof(ciphertext), transmittingRadio);
-    // Radio.TXnb((uint8_t*)&otaPkt, ExpressLRS_currAirRate_Modparams->PayloadLength, transmittingRadio);
-#else
     Radio.TXnb((uint8_t*)&otaPkt, ExpressLRS_currAirRate_Modparams->PayloadLength, transmittingRadio);
-#endif
 
     return true;
 }
@@ -885,6 +883,12 @@ bool ICACHE_RAM_ATTR UnpackChannelDataEncrypted(OTA_Packet_s const * const otaPk
 
 static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPktPtr)
 {
+    uint8_t rcdata_ciphertext[10] = {0};
+    int8_t rcdata_ciphertext_len = 0;
+    uint8_t rcdata_plaintext[6] = {0};
+    int8_t rcdata_plaintext_len = 0;
+    OTA_Packet_s otaPkt = {0};
+
     // Must be fully connected to process RC packets, prevents processing RC
     // during sync, where packets can be received before connection
     if (connectionState != connected || SwitchModePending)
@@ -900,6 +904,46 @@ static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPkt
     else
     {
         telemetryConfirmValue = OtaUnpackChannelData(otaPktPtr, ChannelData, ExpressLRS_currTlmDenom);
+
+        if (crypto != nullptr && config.GetSecurity() > 0)
+        {
+            memcpy(&otaPkt, otaPktPtr, sizeof(OTA_Packet_s));
+            memcpy(rcdata_ciphertext, otaPktPtr->full.rc_encrypted.raw, sizeof(otaPktPtr->full.rc_encrypted.raw));
+            rcdata_plaintext_len = crypto->decrypt(rcdata_ciphertext, sizeof(rcdata_ciphertext), rcdata_plaintext);
+            if (rcdata_plaintext_len == -1)
+            {
+                DBGLN("RC data decryption failed");
+                return;
+            }
+            memcpy(&otaPkt.full.rc_encrypted.raw[0], rcdata_plaintext, rcdata_plaintext_len);
+
+            // DebugSerial.print("Encrypted RX: ");
+            // for (uint8_t i = 0 ; i < 10; i++)
+            // {
+            //   DebugSerial.print(otaPktPtr->full.rc_encrypted.raw[i], HEX);
+            //   DebugSerial.print(" ");
+            // }
+            // DebugSerial.println();
+
+            telemetryConfirmValue = OtaUnpackChannelData_RCDATA_AIO(&otaPkt, ChannelData, ExpressLRS_currTlmDenom);
+            if (config.GetSecurity() == 1)
+            {
+                DebugSerial.print("LEA-GCM ");
+            }
+            if (config.GetSecurity() == 2)
+            {
+                DebugSerial.print("ASCON ");
+            }
+        }
+
+        DebugSerial.print("RX: ");
+        for (uint8_t i = 0; i < 9; i++)
+        {
+            DebugSerial.print(ChannelData[i]);
+            DebugSerial.print(" ");
+        }
+        DebugSerial.println();
+
         securityType = 0;
     }
 
@@ -1059,45 +1103,7 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
     }
     uint32_t const beginProcessing = micros();
 
-#if defined(USE_LEA)
-    uint8_t plaintext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = {0};
-    int ret = 0;
-
-    // Print encrypted data for demo at 2024. 06
-    // DebugSerial.write(0xC8); // sync byte
-    // DebugSerial.write(0x18); // length
-    // DebugSerial.write(0x16); // encrypted rc channel
-    // for (int i = 0; i < 20; i++) {
-    //   DebugSerial.write(Radio.RXdataBuffer[i]);
-    // }
-
-    // decrypt the packet
-    lea_elapsedTime = micros();
-    ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
-    lea_processTime += micros() - lea_elapsedTime;
-    lea_processTicks += lea_gcm.decryption_time();
-    lea_samples++;
-    if (lea_samples == 100) {
-        DebugSerial.print("RX average time of decryption: ");
-        DebugSerial.print(lea_processTime/100);
-        DebugSerial.print(" us, ");
-        lea_processTicks_ = lea_processTicks/100;
-        DebugSerial.print(lea_processTicks_);
-        DebugSerial.println(" ticks");
-        lea_samples = 0;
-        lea_processTime = 0;
-        lea_processTicks = 0;
-    }
-    if (ret != 0)
-    {
-        DBGLN("LEA GCM decrypt error");
-        return false;
-    }
-
-    OTA_Packet_s * otaPktPtr = (OTA_Packet_s * )plaintext;
-#else
     OTA_Packet_s * const otaPktPtr = (OTA_Packet_s * const)Radio.RXdataBuffer;
-#endif
 
     if (!OtaValidatePacketCrc(otaPktPtr))
     {
@@ -1174,7 +1180,7 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
 
 bool ICACHE_RAM_ATTR RXdoneISR(SX12xxDriverCommon::rx_status const status)
 {
-#if defined(USE_LEA) && defined(USE_LEA_KEY_EXCHANGE)
+#if defined(USE_CRYPTO) && defined(USE_CRYPTO_KEY_EXCHANGE)
     if (!RxHandshake.IsDone())
     {
       RxHandshake.RXdoneCallback(status);
@@ -1197,7 +1203,7 @@ bool ICACHE_RAM_ATTR RXdoneISR(SX12xxDriverCommon::rx_status const status)
 
 void ICACHE_RAM_ATTR TXdoneISR()
 {
-#if defined(USE_LEA) && defined(USE_LEA_KEY_EXCHANGE)
+#if defined(USE_CRYPTO) && defined(USE_CRYPTO_KEY_EXCHANGE)
     if (!RxHandshake.IsDone())
     {
       RxHandshake.TXdoneCallback();
@@ -1446,15 +1452,12 @@ static void setupSerial()
     SerialLogger = &Serial;
 #endif
 
-#if defined(USE_LEA)
+#if defined(TARGET_RX_LEA) || defined(TARGET_AIO_RX_LEA)
   DebugSerial.setRx(GPIO_PIN_DEBUG_RX);
   DebugSerial.setTx(GPIO_PIN_DEBUG_TX);
   DebugSerial.begin(420000);
+  SerialLogger = &DebugSerial;
 #endif
-  DebugSerial.setRx(GPIO_PIN_DEBUG_RX);
-  DebugSerial.setTx(GPIO_PIN_DEBUG_TX);
-  DebugSerial.begin(420000);
-#
 }
 
 static void serialShutdown()
@@ -1475,6 +1478,37 @@ void reconfigureSerial()
 {
     serialShutdown();
     setupSerial();
+}
+
+void reconfigureCrypto()
+{
+#if defined(USE_CRYPTO)
+  if (config.GetSecurity() == 0) {
+    crypto = nullptr;
+    DebugSerial.print("\r\nUsing no crypto\r\n");
+    return;
+  }
+  else if (config.GetSecurity() == 1) {
+    crypto = &lea_gcm;
+    DebugSerial.print("\r\nUsing LEA GCM crypto\r\n");
+  }
+  else if (config.GetSecurity() == 2) {
+    crypto = &ascon;
+    DebugSerial.print("\r\nUsing ASCON crypto\r\n");
+  }
+
+  #if defined(USE_CRYPTO_KEY_EXCHANGE)
+    uint8_t K[16] = {0}; uint8_t A[16] = {0}; uint8_t N[16] = {0};
+    size_t K_len = 0; size_t A_len = 0; size_t N_len = 0;
+
+    RxHandshake.LeaKey(K, K_len, A, A_len, N, N_len);
+    if (crypto != nullptr && config.GetSecurity() > 0)
+        crypto->init(K, K_len, A, A_len, N, N_len);
+  #else
+    if (crypto != nullptr && config.GetSecurity() > 0)
+        crypto->init();
+  #endif
+#endif
 }
 
 static void setupConfigAndPocCheck()
@@ -1825,12 +1859,14 @@ void resetConfigAndReboot()
 
 void setup()
 {
-#if defined(USE_LEA) && defined(USE_LEA_KEY_EXCHANGE)
+#if defined(USE_CRYPTO) && defined(USE_CRYPTO_KEY_EXCHANGE)
+  setupSerial();
+  DebugSerial.println("\r\nWaiting for crypto key exchange handshake...");
   delay(4000); // When using LEA key exchange, the RX must be powered up after the TX
                // Wait up to 3~4 seconds(TX red LED turns on) after hearing the 'WELCOME TO EDGE TX' message from RC transmitter and then power up the RX radio.
   Radio.Begin();
   Radio.Config(SX1280_LORA_BW_0800, SX1280_LORA_SF6, SX1280_LORA_CR_LI_4_8,
-               0xba1b91, 12, true, DATA_SIZE, 20000, 0, 0, 0);
+               0xba1b91, 12, true, HANDSHAKE_DATA_SIZE, 20000, 0, 0, 0);
   Radio.RXdoneCallback = &RXdoneISR;
   Radio.TXdoneCallback = &TXdoneISR;
   Radio.SetFrequencyHz(2420000000, Radio.GetLastSuccessfulPacketRadio());
@@ -1840,6 +1876,8 @@ void setup()
   while (!RxHandshake.IsDone()) {
     RxHandshake.DoHandle();
   }
+  DebugSerial.println("Crypto key exchange done");
+  delay(100);
 #endif
 
     #if defined(TARGET_UNIFIED_RX)
@@ -1870,6 +1908,10 @@ void setup()
         Serial.begin(serialBaud);
         SerialLogger = &Serial;
         #else
+        SerialLogger = new NullStream();
+        #endif
+
+        #if defined(TARGET_RX_LEA) || defined(TARGET_AIO_RX_LEA)
         SerialLogger = new NullStream();
         #endif
 
@@ -1918,8 +1960,8 @@ void setup()
             hwTimer::init(HWtimerCallbackTick, HWtimerCallbackTock);
         }
 
-#if defined(USE_LEA)
-        lea_gcm.init();
+#if defined(USE_CRYPTO)
+  reconfigureCrypto();
 #endif
     }
 

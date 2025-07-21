@@ -23,6 +23,8 @@ static Crc2Byte ota_crc;
 ValidatePacketCrc_t OtaValidatePacketCrc;
 GeneratePacketCrc_t OtaGeneratePacketCrc;
 
+extern HardwareSerial DebugSerial;
+
 void OtaUpdateCrcInitFromUid()
 {
     OtaCrcInitializer = (UID[4] << 8) | UID[5];
@@ -276,6 +278,121 @@ static void ICACHE_RAM_ATTR GenerateChannelData8ch(OTA_Packet_s * const otaPktPt
     GenerateChannelData8ch12ch((OTA_Packet8_s * const)otaPktPtr, channelData, TelemetryStatus, false);
 }
 
+void PackUInt11ToChannels4x2(const crsf_channels_t* src, uint8_t* destChannels4x2, uint8_t isHighAux) {
+    // Pack the high channels (either CH5-CH8 or CH9-CH12 depending on isHighAux)
+    if (isHighAux) {
+        // Pack the high channel(11-bits) into a 2-bits value
+        *destChannels4x2 = (CRSF_to_N(src->ch9, 4) << 0) |
+                  (CRSF_to_N(src->ch10, 4) << 2) |
+                  (CRSF_to_N(src->ch11, 4) << 4) |
+                  (CRSF_to_N(src->ch12, 4) << 6);
+    } else {
+        *destChannels4x2 = (CRSF_to_N(src->ch5, 4) << 0) |
+                  (CRSF_to_N(src->ch6, 4) << 2) |
+                  (CRSF_to_N(src->ch7, 4) << 4) |
+                  (CRSF_to_N(src->ch8, 4) << 6);
+    }
+}
+
+void OtaPackChannelData_RCDATA_AIO(uint8_t * rcdata, const uint32_t *channelData, bool telemetryStatus, uint8_t tlmDenom, uint8_t isHighAux)
+{
+  OTA_Channels_4x10 tempChannels;
+  PackUInt11ToChannels4x10(&channelData[0], &tempChannels, &Decimate11to10_Div2);
+
+  uint8_t channelData_ch5_ch12;
+  crsf_channels_t crsf_channelData_ch5_ch12;
+  crsf_channelData_ch5_ch12.ch5 = channelData[5];
+  crsf_channelData_ch5_ch12.ch6 = channelData[6];
+  crsf_channelData_ch5_ch12.ch7 = channelData[7];
+  crsf_channelData_ch5_ch12.ch8 = channelData[8];
+  crsf_channelData_ch5_ch12.ch9 = channelData[9];
+  crsf_channelData_ch5_ch12.ch10 = channelData[10];
+  crsf_channelData_ch5_ch12.ch11 = channelData[11];
+  crsf_channelData_ch5_ch12.ch12 = channelData[12];
+
+  PackUInt11ToChannels4x2(&crsf_channelData_ch5_ch12, &channelData_ch5_ch12, isHighAux);
+
+  memcpy(&rcdata[0], &tempChannels.raw[0], sizeof(OTA_Channels_4x10));
+  rcdata[5] = channelData_ch5_ch12; // Pack the high channels (CH5-CH12) into the last byte
+}
+
+static void UnpackChannels4x10ToUInt11(OTA_Channels_4x10 const * const srcChannels4x10, uint32_t * const dest)
+{
+    uint8_t const * const payload = (uint8_t const * const)srcChannels4x10;
+    constexpr unsigned numOfChannels = 4;
+    constexpr unsigned srcBits = 10;
+    constexpr unsigned dstBits = 11;
+    constexpr unsigned inputChannelMask = (1 << srcBits) - 1;
+    constexpr unsigned precisionShift = dstBits - srcBits;
+
+    // code from BetaFlight rx/crsf.cpp / bitpacker_unpack
+    uint8_t bitsMerged = 0;
+    uint32_t readValue = 0;
+    unsigned readByteIndex = 0;
+    for (uint8_t n = 0; n < numOfChannels; n++)
+    {
+        while (bitsMerged < srcBits)
+        {
+            uint8_t readByte = payload[readByteIndex++];
+            readValue |= ((uint32_t) readByte) << bitsMerged;
+            bitsMerged += 8;
+        }
+        //printf("rv=%x(%x) bm=%u\n", readValue, (readValue & channelMask), bitsMerged);
+        dest[n] = (readValue & inputChannelMask) << precisionShift;
+        readValue >>= srcBits;
+        bitsMerged -= srcBits;
+    }
+}
+
+void UnpackChannels4x2ToUInt11(uint8_t const srcChannels4x2, uint32_t * dest, uint8_t isHighAux) {
+  if (isHighAux) {
+    dest[4] = N_to_CRSF((srcChannels4x2 >> 0) & 0x03, 3);
+    dest[5] = N_to_CRSF((srcChannels4x2 >> 2) & 0x03, 3);
+    dest[6] = N_to_CRSF((srcChannels4x2 >> 4) & 0x03, 3);
+    dest[7] = N_to_CRSF((srcChannels4x2 >> 6) & 0x03, 3);
+  } else {
+    dest[0] = N_to_CRSF((srcChannels4x2 >> 0) & 0x03, 3);
+    dest[1] = N_to_CRSF((srcChannels4x2 >> 2) & 0x03, 3);
+    dest[2] = N_to_CRSF((srcChannels4x2 >> 4) & 0x03, 3);
+    dest[3] = N_to_CRSF((srcChannels4x2 >> 6) & 0x03, 3);
+  }
+}
+
+void printChannelData_AIO(uint32_t *ChannelData) {
+  static uint32_t channelData[CRSF_NUM_CHANNELS] = {0};
+  crsf_channels_t crsf_channelData_ch5_ch12;
+
+  OTA_Channels_4x10 tempChannels;
+  channelData[0] = ChannelData[0];
+  channelData[1] = ChannelData[1];
+  channelData[2] = ChannelData[2];
+  channelData[3] = ChannelData[3];
+  PackUInt11ToChannels4x10(channelData, &tempChannels, &Decimate11to10_Div2);
+  UnpackChannels4x10ToUInt11(&tempChannels, channelData);
+  channelData[4] = ChannelData[4] > CRSF_CHANNEL_VALUE_MID ? CRSF_CHANNEL_VALUE_2000 : CRSF_CHANNEL_VALUE_1000;
+
+  crsf_channelData_ch5_ch12.ch5 = ChannelData[5];
+  crsf_channelData_ch5_ch12.ch6 = ChannelData[6];
+  crsf_channelData_ch5_ch12.ch7 = ChannelData[7];
+  crsf_channelData_ch5_ch12.ch8 = ChannelData[8];
+  crsf_channelData_ch5_ch12.ch9 = ChannelData[9];
+  crsf_channelData_ch5_ch12.ch10 = ChannelData[10];
+  crsf_channelData_ch5_ch12.ch11 = ChannelData[11];
+  crsf_channelData_ch5_ch12.ch12 = ChannelData[12];
+
+  // Extract CH5-CH12 from the last 1 bytes
+  uint8_t channelData_ch5_ch12;
+  PackUInt11ToChannels4x2(&crsf_channelData_ch5_ch12, &channelData_ch5_ch12, false);
+  UnpackChannels4x2ToUInt11(channelData_ch5_ch12, &channelData[5], false);
+
+  DebugSerial.print("TX: ");
+  for (int i = 0; i < 9; i++) {
+    DebugSerial.print(channelData[i]);
+    DebugSerial.print(" ");
+  }
+  DebugSerial.println();
+}
+
 static bool FullResIsHighAux;
 #if defined(UNIT_TEST)
 void OtaSetFullResNextChannelSet(bool next) { FullResIsHighAux = next; }
@@ -475,6 +592,60 @@ bool ICACHE_RAM_ATTR UnpackChannelData8ch(OTA_Packet_s const * const otaPktPtr, 
     // ** Different than the 10bit encoding in Hybrid/Wide mode **
     UnpackChannels4x10ToUInt11(&ota8->rc.chLow, &channelData[chDstLow]);
     UnpackChannels4x10ToUInt11(&ota8->rc.chHigh, &channelData[chDstHigh]);
+#endif
+    // Restore the uplink_TX_Power range 0-7 -> 1-8
+    CRSF::updateUplinkPower(ota8->rc.uplinkPower + 1);
+    return ota8->rc.telemetryStatus;
+}
+
+void UnpackChannels4x2ToUInt11(uint8_t const srcChannels4x2, uint32_t * dest, uint8_t isHighAux) {
+  if (isHighAux) {
+    dest[4] = N_to_CRSF((srcChannels4x2 >> 0) & 0x03, 3);
+    dest[5] = N_to_CRSF((srcChannels4x2 >> 2) & 0x03, 3);
+    dest[6] = N_to_CRSF((srcChannels4x2 >> 4) & 0x03, 3);
+    dest[7] = N_to_CRSF((srcChannels4x2 >> 6) & 0x03, 3);
+  } else {
+    dest[0] = N_to_CRSF((srcChannels4x2 >> 0) & 0x03, 3);
+    dest[1] = N_to_CRSF((srcChannels4x2 >> 2) & 0x03, 3);
+    dest[2] = N_to_CRSF((srcChannels4x2 >> 4) & 0x03, 3);
+    dest[3] = N_to_CRSF((srcChannels4x2 >> 6) & 0x03, 3);
+  }
+}
+
+bool ICACHE_RAM_ATTR OtaUnpackChannelData_RCDATA_AIO(OTA_Packet_s const * const otaPktPtr, uint32_t *channelData, uint8_t const tlmDenom)
+{
+    (void)tlmDenom;
+
+    OTA_Packet8_s const * const ota8 = (OTA_Packet8_s const * const)otaPktPtr;
+
+#if defined(DEBUG_RCVR_LINKSTATS)
+    debugRcvrLinkstatsPacketId = ota8->dbg_linkstats.packetNum;
+#else
+    uint8_t chDstLow;
+    uint8_t chDstHigh;
+    if (OtaSwitchModeCurrent == smHybridOr16ch)
+    {
+        if (ota8->rc.isHighAux)
+        {
+            chDstLow = 8;
+            chDstHigh = 12;
+        }
+        else
+        {
+            chDstLow = 0;
+            chDstHigh = 4;
+        }
+    }
+    else
+    {
+        channelData[4] = BIT_to_CRSF(ota8->rc.ch4);
+        chDstLow = 0;
+        chDstHigh = (ota8->rc.isHighAux) ? 9 : 5;
+    }
+    // Analog channels packed 10bit covering the entire CRSF extended range (i.e. not just 988-2012)
+    // ** Different than the 10bit encoding in Hybrid/Wide mode **
+    UnpackChannels4x10ToUInt11(&ota8->rc.chLow, &channelData[chDstLow]);
+    UnpackChannels4x2ToUInt11(ota8->rc_encrypted.raw[5], &channelData[chDstHigh], ota8->rc.isHighAux);
 #endif
     // Restore the uplink_TX_Power range 0-7 -> 1-8
     CRSF::updateUplinkPower(ota8->rc.uplinkPower + 1);

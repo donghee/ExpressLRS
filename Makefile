@@ -17,7 +17,7 @@ setup: build-docker-image
 
 prebuild:
 	sudo chown -R `id -un` src/.pio/build
-	git pull --rebase --autostash
+	#git pull --rebase --autostash
 	
 build-tx: prebuild
 	cd src; ./mbedtls_patch.sh; pio run -t clean -e LEA_2400_TX_via_STLINK && pio debug -e LEA_2400_TX_via_STLINK
