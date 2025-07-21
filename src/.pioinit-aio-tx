@@ -1,3 +1,5 @@
+#!killall pyocd
+!pyocd gdbserver -t stm32f479iihx -u 005300393433510837363934 -p 3333 -T 4444 &
 set pagination off
 
 file .pio/build/LEA_2400_AIO_TX_via_STLINK/firmware.elf
