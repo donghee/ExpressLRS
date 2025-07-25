@@ -225,7 +225,7 @@ bool returnModelFromLoan = false;
 static unsigned long loanBindTimeout = LOAN_BIND_TIMEOUT_DEFAULT;
 static unsigned long loadBindingStartedMs = 0;
 
-#if defined(USE_LEA)
+#if defined(USE_CRYPTO)
 GCM lea_gcm;
 Ascon128 ascon;
 volatile unsigned long lea_elapsedTime;
@@ -233,7 +233,7 @@ volatile unsigned long lea_processTime = 0;
 volatile uint32_t long lea_processTicks = 0;
 volatile uint32_t long lea_processTicks_ = 0;
 volatile unsigned int lea_samples = 0;
-#if defined(USE_LEA_KEY_EXCHANGE)
+#if defined(USE_CRYPTO_KEY_EXCHANGE)
 RxHandshakeClass RxHandshake;
 #endif
 #endif
@@ -356,13 +356,13 @@ void SetRFLinkRate(uint8_t index) // Set speed of RF link
 #if defined(DEBUG_FREQ_CORRECTION) && defined(RADIO_SX128X)
     interval = interval * 12 / 10; // increase the packet interval by 20% to allow adding packet header
 #endif
-#if defined(USE_LEA) && defined(RADIO_SX128X)
+#if defined(USE_CRYPTO) && defined(RADIO_SX128X)
     interval = interval * 14.5 / 10; // increase the packet interval by 35% to allow adding lea packet header
                                      // Why 45%? It is as follows. addtional lea packet is more than 30%, so add 40% to the original interval.
 #endif
     hwTimer::updateInterval(interval);
     Radio.Config(ModParams->bw, ModParams->sf, ModParams->cr, GetInitialFreq(),
-#if defined(USE_LEA)
+#if defined(USE_CRYPTO)
                  ModParams->PreambleLen, invertIQ, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE, 0
 #else
                  ModParams->PreambleLen, invertIQ, ModParams->PayloadLength, 0
@@ -542,7 +542,7 @@ bool ICACHE_RAM_ATTR HandleSendTelemetryResponse()
         transmittingRadio = SX12XX_Radio_NONE;
     }
 
-#if defined(USE_LEA)
+#if defined(USE_CRYPTO)
     int ret = 0;
     uint8_t ciphertext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = { 0 };
     // ret = lea_gcm.encrypt(&otaPkt, ciphertext, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
@@ -1069,7 +1069,7 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
     }
     uint32_t const beginProcessing = micros();
 
-#if defined(USE_LEA)
+#if defined(USE_CRYPTO)
     uint8_t plaintext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = {0};
     int ret = 0;
 
@@ -1186,7 +1186,7 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
 
 bool ICACHE_RAM_ATTR RXdoneISR(SX12xxDriverCommon::rx_status const status)
 {
-#if defined(USE_LEA) && defined(USE_LEA_KEY_EXCHANGE)
+#if defined(USE_CRYPTO) && defined(USE_CRYPTO_KEY_EXCHANGE)
     if (!RxHandshake.IsDone())
     {
       RxHandshake.RXdoneCallback(status);
@@ -1209,7 +1209,7 @@ bool ICACHE_RAM_ATTR RXdoneISR(SX12xxDriverCommon::rx_status const status)
 
 void ICACHE_RAM_ATTR TXdoneISR()
 {
-#if defined(USE_LEA) && defined(USE_LEA_KEY_EXCHANGE)
+#if defined(USE_CRYPTO) && defined(USE_CRYPTO_KEY_EXCHANGE)
     if (!RxHandshake.IsDone())
     {
       RxHandshake.TXdoneCallback();
@@ -1834,7 +1834,7 @@ void resetConfigAndReboot()
 
 void setup()
 {
-#if defined(USE_LEA) && defined(USE_LEA_KEY_EXCHANGE)
+#if defined(USE_CRYPTO) && defined(USE_CRYPTO_KEY_EXCHANGE)
   delay(4000); // When using LEA key exchange, the RX must be powered up after the TX
                // Wait up to 3~4 seconds(TX red LED turns on) after hearing the 'WELCOME TO EDGE TX' message from RC transmitter and then power up the RX radio.
   Radio.Begin();
@@ -1931,7 +1931,7 @@ void setup()
             hwTimer::init(HWtimerCallbackTick, HWtimerCallbackTock);
         }
 
-#if defined(USE_LEA)
+#if defined(USE_CRYPTO)
         lea_gcm.init();
         ascon.init();
 #endif

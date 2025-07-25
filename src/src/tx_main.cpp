@@ -80,7 +80,7 @@ StubbornReceiver TelemetryReceiver;
 StubbornSender MspSender;
 uint8_t CRSFinBuffer[CRSF_MAX_PACKET_LEN+1];
 
-#if defined(USE_LEA)
+#if defined(USE_CRYPTO)
 GCM lea_gcm;
 Ascon128 ascon;
 volatile unsigned long lea_elapsedTime;
@@ -88,7 +88,7 @@ volatile unsigned long lea_processTime = 0;
 volatile unsigned long lea_processTicks = 0;
 volatile unsigned int lea_samples = 0;
 
-#if defined(USE_LEA_KEY_EXCHANGE)
+#if defined(USE_CRYPTO_KEY_EXCHANGE)
 TxHandshakeClass TxHandshake;
 #endif
 #endif
@@ -206,7 +206,7 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
     return false;
   }
 
-#if defined(USE_LEA)
+#if defined(USE_CRYPTO)
   uint8_t plaintext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = {0};
   int ret = 0;
 
@@ -398,12 +398,12 @@ void SetRFLinkRate(uint8_t index) // Set speed of RF link (hz)
 #if defined(DEBUG_FREQ_CORRECTION) && defined(RADIO_SX128X)
   interval = interval * 12 / 10; // increase the packet interval by 20% to allow adding packet header
 #endif
-#if defined(USE_LEA) && defined(RADIO_SX128X)
+#if defined(USE_CRYPTO) && defined(RADIO_SX128X)
   interval = interval * 14.5 / 10; // increase the packet interval by 45% to allow adding lea packet header
 #endif
   hwTimer::updateInterval(interval);
   Radio.Config(ModParams->bw, ModParams->sf, ModParams->cr, GetInitialFreq(),
-#if defined(USE_LEA)
+#if defined(USE_CRYPTO)
                ModParams->PreambleLen, invertIQ, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE, interval
 #else
                ModParams->PreambleLen, invertIQ, ModParams->PayloadLength, ModParams->interval
@@ -565,7 +565,7 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
 
       const uint32_t now_ms = millis();
       dt = now_ms - msp_elapsedTime;
-#if defined(USE_LEA)
+#if defined(USE_CRYPTO)
       DebugSerial.print("TX MSP hz: ");
       DebugSerial.print(dt);
       DebugSerial.println("us");
@@ -651,7 +651,7 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
   }
 #endif
 
-#if defined(USE_LEA)
+#if defined(USE_CRYPTO)
   uint8_t ciphertext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = { 0 };
   int ret = 0;
 
@@ -923,7 +923,7 @@ static void CheckConfigChangePending()
 
 bool ICACHE_RAM_ATTR RXdoneISR(SX12xxDriverCommon::rx_status const status)
 {
-#if defined(USE_LEA) && defined(USE_LEA_KEY_EXCHANGE)
+#if defined(USE_CRYPTO) && defined(USE_CRYPTO_KEY_EXCHANGE)
   if (!TxHandshake.IsDone()) {
     TxHandshake.RXdoneCallback(status);
     return true;
@@ -942,7 +942,7 @@ bool ICACHE_RAM_ATTR RXdoneISR(SX12xxDriverCommon::rx_status const status)
 
 void ICACHE_RAM_ATTR TXdoneISR()
 {
-#if defined(USE_LEA) && defined(USE_LEA_KEY_EXCHANGE)
+#if defined(USE_CRYPTO) && defined(USE_CRYPTO_KEY_EXCHANGE)
   if (!TxHandshake.IsDone()) {
     TxHandshake.TXdoneCallback();
     return;
@@ -1388,7 +1388,7 @@ static void cyclePower()
 
 void setup()
 {
-#if defined(USE_LEA) && defined(USE_LEA_KEY_EXCHANGE)
+#if defined(USE_CRYPTO) && defined(USE_CRYPTO_KEY_EXCHANGE)
   // LEA key
   uint8_t K[16] = {0}; uint8_t A[16] = {0}; uint8_t N[16] = {0};
   size_t K_len = 0; size_t A_len = 0; size_t N_len = 0;
@@ -1496,8 +1496,8 @@ void setup()
     UARTconnected();
   }
 
-#if defined(USE_LEA)
-  #if defined(USE_LEA_KEY_EXCHANGE)
+#if defined(USE_CRYPTO)
+  #if defined(USE_CRYPTO_KEY_EXCHANGE)
     // lea_gcm.init(K, K_len, A, A_len, N, N_len);
     ascon.init(K, K_len, A, A_len, N, N_len);
   #else
