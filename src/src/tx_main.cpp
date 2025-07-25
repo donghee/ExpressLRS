@@ -1292,6 +1292,7 @@ static void setupSerial()
   DebugSerial.setRx(GPIO_PIN_DEBUG_RX);
   DebugSerial.setTx(GPIO_PIN_DEBUG_TX);
   DebugSerial.begin(420000);
+  TxBackpack = &DebugSerial; // AIO TX UART4
 #endif
 }
 

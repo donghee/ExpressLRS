@@ -1454,6 +1454,7 @@ static void setupSerial()
   DebugSerial.setRx(GPIO_PIN_DEBUG_RX);
   DebugSerial.setTx(GPIO_PIN_DEBUG_TX);
   DebugSerial.begin(420000);
+  SerialLogger = &DebugSerial;
 #endif
 }
 
@@ -1870,6 +1871,10 @@ void setup()
         Serial.begin(serialBaud);
         SerialLogger = &Serial;
         #else
+        SerialLogger = new NullStream();
+        #endif
+
+        #if defined(TARGET_RX_LEA) || defined(TARGET_AIO_RX_LEA)
         SerialLogger = new NullStream();
         #endif
 
