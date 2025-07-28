@@ -294,6 +294,7 @@ extern bool VRxBackpackWiFiReadyToSend;
 extern unsigned long rebootTime;
 extern void setWifiUpdateMode();
 #endif
+extern void reconfigureCrypto();
 
 static void luadevUpdateModelID() {
   itoa(CRSF::getModelID(), modelMatchUnit+6, 10);
@@ -576,6 +577,10 @@ static void registerLuaParameters()
 {
   registerLUAParameter(&luaSecurity, [](struct luaPropertiesCommon *item, uint8_t arg) {
     config.SetSecurity(arg);
+    if (config.IsModified()) {
+        // Reconfigure serial to apply the new security settings
+        reconfigureCrypto();
+    }
   });
 
   if (HAS_RADIO) {

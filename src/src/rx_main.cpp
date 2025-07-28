@@ -544,17 +544,23 @@ bool ICACHE_RAM_ATTR HandleSendTelemetryResponse()
     }
 
 #if defined(USE_CRYPTO)
+  if (config.GetSecurity() > 0)
+  {
     int ret = 0;
     uint8_t ciphertext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = { 0 };
     ret = crypto->encrypt(&otaPkt, ciphertext, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
     if (ret == -1)
     {
-      DBGLN("LEA GCM encrypt error");
+      DBGLN("encrypt error");
       return false;
     }
 
     Radio.TXnb(ciphertext, sizeof(ciphertext), transmittingRadio);
-    // Radio.TXnb((uint8_t*)&otaPkt, ExpressLRS_currAirRate_Modparams->PayloadLength, transmittingRadio);
+  }
+  else
+  {
+    Radio.TXnb((uint8_t*)&otaPkt, ExpressLRS_currAirRate_Modparams->PayloadLength, transmittingRadio);
+  }
 #else
     Radio.TXnb((uint8_t*)&otaPkt, ExpressLRS_currAirRate_Modparams->PayloadLength, transmittingRadio);
 #endif
@@ -1070,9 +1076,11 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
     uint32_t const beginProcessing = micros();
 
 #if defined(USE_CRYPTO)
-    uint8_t plaintext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = {0};
-    int ret = 0;
-
+  OTA_Packet_s * otaPktPtr = (OTA_Packet_s * const)Radio.RXdataBuffer;
+  uint8_t plaintext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = {0};
+  int ret = 0;
+  if (config.GetSecurity() > 0)
+  {
     // Print encrypted data for demo at 2024. 06
     // DebugSerial.write(0xC8); // sync byte
     // DebugSerial.write(0x18); // length
@@ -1088,6 +1096,11 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
     crypto_processTicks += crypto->decryption_time();
     crypto_samples++;
     if (crypto_samples == 100) {
+        if (config.GetSecurity() == 1) {
+          DebugSerial.print("LEA-GCM: ");
+        } else if (config.GetSecurity() == 2) {
+          DebugSerial.print("ASCON: ");
+        }
         DebugSerial.print("RX average time of decryption: ");
         DebugSerial.print(crypto_processTime/100);
         DebugSerial.print(" us, ");
@@ -1099,11 +1112,12 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
     }
     if (ret == -1)
     {
-        DBGLN("LEA GCM decrypt error");
+        DBGLN("decrypt error");
         return false;
     }
 
-    OTA_Packet_s * otaPktPtr = (OTA_Packet_s * )plaintext;
+    otaPktPtr = (OTA_Packet_s * )plaintext;
+  }
 #else
     OTA_Packet_s * const otaPktPtr = (OTA_Packet_s * const)Radio.RXdataBuffer;
 #endif
@@ -1481,6 +1495,30 @@ void reconfigureSerial()
 {
     serialShutdown();
     setupSerial();
+}
+
+void reconfigureCrypto()
+{
+#if defined(USE_CRYPTO)
+  crypto = &ascon;
+  if (config.GetSecurity() == 0) {
+    DebugSerial.print("\r\nUsing no crypto\r\n");
+  }
+  else if (config.GetSecurity() == 1) {
+    crypto = &lea_gcm;
+    DebugSerial.print("\r\nUsing LEA GCM crypto\r\n");
+  }
+  else if (config.GetSecurity() == 2) {
+    crypto = &ascon;
+    DebugSerial.print("\r\nUsing ASCON crypto\r\n");
+  }
+
+  #if defined(USE_CRYPTO_KEY_EXCHANGE)
+    crypto->init(K, K_len, A, A_len, N, N_len);
+  #else
+    crypto->init();
+  #endif
+#endif
 }
 
 static void setupConfigAndPocCheck()
@@ -1929,12 +1967,7 @@ void setup()
         }
 
 #if defined(USE_CRYPTO)
-  crypto = &ascon;
-  #if defined(USE_CRYPTO_KEY_EXCHANGE)
-    crypto->init(K, K_len, A, A_len, N, N_len);
-  #else
-    crypto->init();
-  #endif
+  reconfigureCrypto();
 #endif
     }
 

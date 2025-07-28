@@ -209,17 +209,21 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
   }
 
 #if defined(USE_CRYPTO)
-  uint8_t plaintext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = {0};
-  int ret = 0;
-
-  ret = crypto->decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
-  if (ret == -1)
+  OTA_Packet_s * otaPktPtr = (OTA_Packet_s * const)Radio.RXdataBuffer;
+  if (config.GetSecurity() > 0)
   {
-      DBGLN("LEA GCM decrypt error");
-      return false;
-  }
+    uint8_t plaintext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = {0};
+    int ret = 0;
 
-  OTA_Packet_s * const otaPktPtr = (OTA_Packet_s * const)plaintext;
+    ret = crypto->decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
+    if (ret == -1)
+    {
+        DBGLN("decrypt error");
+        return false;
+    }
+
+    otaPktPtr = (OTA_Packet_s * const)plaintext;
+  }
 #else
   OTA_Packet_s * const otaPktPtr = (OTA_Packet_s * const)Radio.RXdataBuffer;
 #endif
@@ -653,6 +657,8 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
 #endif
 
 #if defined(USE_CRYPTO)
+if (config.GetSecurity() > 0)
+{
   uint8_t ciphertext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = { 0 };
   int ret = 0;
 
@@ -675,6 +681,11 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
   crypto_processTicks += crypto->encryption_time();
   crypto_samples++;
   if (crypto_samples == 100) {
+    if (config.GetSecurity() == 1) {
+      DebugSerial.print("LEA-GCM: ");
+    } else if (config.GetSecurity() == 2) {
+      DebugSerial.print("ASCON: ");
+    }
     DebugSerial.print("TX average time of encryption: ");
     DebugSerial.print(crypto_processTime/100);
     DebugSerial.print(" us, ");
@@ -686,11 +697,16 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
   }
   if (ret == -1)
   {
-    DBGLN("LEA GCM encrypt error");
+    DBGLN("encrypt error");
     return;
   }
 
   Radio.TXnb((uint8_t*)ciphertext, sizeof(ciphertext), transmittingRadio);
+}
+else
+{
+  Radio.TXnb((uint8_t*)&otaPkt, ExpressLRS_currAirRate_Modparams->PayloadLength, transmittingRadio);
+}
 #else
   Radio.TXnb((uint8_t*)&otaPkt, ExpressLRS_currAirRate_Modparams->PayloadLength, transmittingRadio);
 #endif
@@ -1385,6 +1401,30 @@ static void cyclePower()
   }
 }
 
+void reconfigureCrypto()
+{
+#if defined(USE_CRYPTO)
+  crypto = &ascon;
+  if (config.GetSecurity() == 0) {
+    DebugSerial.print("\r\nUsing no crypto\r\n");
+  }
+  else if (config.GetSecurity() == 1) {
+    crypto = &lea_gcm;
+    DebugSerial.print("\r\nUsing LEA GCM crypto\r\n");
+  }
+  else if (config.GetSecurity() == 2) {
+    crypto = &ascon;
+    DebugSerial.print("\r\nUsing ASCON crypto\r\n");
+  }
+
+  #if defined(USE_CRYPTO_KEY_EXCHANGE)
+    crypto->init(K, K_len, A, A_len, N, N_len);
+  #else
+    crypto->init();
+  #endif
+#endif
+}
+
 void setup()
 {
 #if defined(USE_CRYPTO) && defined(USE_CRYPTO_KEY_EXCHANGE)
@@ -1496,12 +1536,7 @@ void setup()
   }
 
 #if defined(USE_CRYPTO)
-  crypto = &ascon;
-  #if defined(USE_CRYPTO_KEY_EXCHANGE)
-    crypto->init(K, K_len, A, A_len, N, N_len);
-  #else
-    crypto->init();
-  #endif
+  reconfigureCrypto();
 #endif
   // config.SetTlm(TLM_RATIO_1_2); // Force TLM ratio of 1:2 for balanced bi-dir link
   // config.SetMotionMode(0); // Ensure motion detection is off

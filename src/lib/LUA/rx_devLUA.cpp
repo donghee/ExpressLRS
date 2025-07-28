@@ -6,6 +6,7 @@
 
 extern void deferExecution(uint32_t ms, std::function<void()> f);
 extern void reconfigureSerial();
+extern void reconfigureCrypto();
 
 extern bool InLoanBindingMode;
 extern bool returnModelFromLoan;
@@ -146,6 +147,14 @@ static struct luaItem_command luaReturnModel = {
 };
 
 //---------------------------- Model Loan Out -----------------------------
+
+//---------------------------- Security ------------------
+static struct luaItem_selection luaSecurity = {
+    {"Crypto", CRSF_TEXT_SELECTION},
+    0, // value
+    "Off;LEA-GCM;ASCON",
+    STR_EMPTYSPACE};
+
 
 #if defined(GPIO_PIN_PWM_OUTPUTS)
 static void luaparamMappingChannelOut(struct luaPropertiesCommon *item, uint8_t arg)
@@ -339,6 +348,16 @@ static void luaparamSetPower(struct luaPropertiesCommon* item, uint8_t arg)
 
 static void registerLuaParameters()
 {
+  registerLUAParameter(&luaSecurity, [](struct luaPropertiesCommon *item, uint8_t arg) {
+    config.SetSecurity(arg);
+    if (config.IsModified()) {
+      deferExecution(1000, [](){
+        // Reconfigure serial to apply the new security settings
+        reconfigureCrypto();
+      });
+    }
+  });
+
   registerLUAParameter(&luaSerialProtocol, [](struct luaPropertiesCommon* item, uint8_t arg){
     config.SetSerialProtocol((eSerialProtocol)arg);
     if (config.IsModified()) {
@@ -408,6 +427,7 @@ static void registerLuaParameters()
 
 static int event()
 {
+  setLuaTextSelectionValue(&luaSecurity, config.GetSecurity());
   setLuaTextSelectionValue(&luaSerialProtocol, config.GetSerialProtocol());
   setLuaTextSelectionValue(&luaFailsafeMode, config.GetFailsafeMode());
 
