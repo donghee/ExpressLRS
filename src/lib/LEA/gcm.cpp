@@ -19,6 +19,24 @@ void GCM::increment_nonce_counter(uint8_t *nonce)
     }
 }
 
+void GCM::increase_nonce_counter_up_to_32bits_increment(uint8_t *nonce, uint32_t increment)
+{
+	int i;
+	uint32_t carry = increment;
+	uint32_t temp;
+
+    for (i = 15; i >= 0; --i)
+    {
+    	temp = nonce[i] + carry;
+    	nonce[i] = (uint8_t)temp;
+    	carry = temp >> 8;
+        if (carry == 0)
+        {
+            break;
+        }
+    }
+}
+
 uint32_t GCM::encryption_time()
 {
     delta[1] = stop[1] - start[1];
@@ -31,7 +49,8 @@ uint32_t GCM::decryption_time()
     return delta[2];
 }
 
-int GCM::init(uint8_t *K_, size_t K_len_, uint8_t *A_, size_t A_len_, uint8_t *N_, size_t N_len_)
+// int GCM::init(uint8_t *K_, size_t K_len_, uint8_t *A_, size_t A_len_, uint8_t *N_, size_t N_len_)
+int GCM::init(const uint8_t* K_, uint32_t K_len_, const uint8_t* A_, uint32_t A_len_, uint8_t *N_, size_t N_len_)
 {
     int result;
 
@@ -88,7 +107,8 @@ int GCM::init()
 }
 
 // TX
-int GCM::encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen) // ota to data
+//int GCM::encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen) // ota to data
+int GCM::encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen) // otaPktPtr -> data
 {
     int result;
 
@@ -117,6 +137,7 @@ int GCM::encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen) // ota
 }
 
 // RX
+//int GCM::decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen) // data --> otaPktPtr
 int GCM::decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen) // data --> otaPktPtr
 {
     int result;
@@ -163,3 +184,9 @@ int GCM::decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen) 
 
     return 0;
 }
+
+int GCM::encrypt(const uint8_t *plaintext, int plaintext_len, uint8_t *ciphertext) // plaintext to data
+{   return 0; }
+
+int GCM::decrypt(const uint8_t *ciphertext, uint8_t ciphertext_len, uint8_t *plaintext) // ciphertext ->  plaintext
+{   return 0; }

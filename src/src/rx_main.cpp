@@ -228,11 +228,12 @@ static unsigned long loadBindingStartedMs = 0;
 #if defined(USE_CRYPTO)
 GCM lea_gcm;
 Ascon128 ascon;
-volatile unsigned long lea_elapsedTime;
-volatile unsigned long lea_processTime = 0;
-volatile uint32_t long lea_processTicks = 0;
-volatile uint32_t long lea_processTicks_ = 0;
-volatile unsigned int lea_samples = 0;
+Crypto* crypto = nullptr;
+
+volatile unsigned long crypto_elapsedTime;
+volatile unsigned long crypto_processTime = 0;
+volatile uint32_t long crypto_processTicks = 0;
+volatile unsigned int crypto_samples = 0;
 #if defined(USE_CRYPTO_KEY_EXCHANGE)
 RxHandshakeClass RxHandshake;
 #endif
@@ -545,8 +546,7 @@ bool ICACHE_RAM_ATTR HandleSendTelemetryResponse()
 #if defined(USE_CRYPTO)
     int ret = 0;
     uint8_t ciphertext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = { 0 };
-    // ret = lea_gcm.encrypt(&otaPkt, ciphertext, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
-    ret = ascon.encrypt(&otaPkt, ciphertext, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
+    ret = crypto->encrypt(&otaPkt, ciphertext, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
     if (ret == -1)
     {
       DBGLN("LEA GCM encrypt error");
@@ -1082,23 +1082,20 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
     // }
 
     // decrypt the packet
-    lea_elapsedTime = micros();
-    // ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
-    ret = ascon.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
-    lea_processTime += micros() - lea_elapsedTime;
-    // lea_processTicks += lea_gcm.decryption_time();
-    lea_processTicks += ascon.decryption_time();
-    lea_samples++;
-    if (lea_samples == 100) {
+    crypto_elapsedTime = micros();
+    ret = crypto->decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
+    crypto_processTime += micros() - crypto_elapsedTime;
+    crypto_processTicks += crypto->decryption_time();
+    crypto_samples++;
+    if (crypto_samples == 100) {
         DebugSerial.print("RX average time of decryption: ");
-        DebugSerial.print(lea_processTime/100);
+        DebugSerial.print(crypto_processTime/100);
         DebugSerial.print(" us, ");
-        lea_processTicks_ = lea_processTicks/100;
-        DebugSerial.print(lea_processTicks_);
+        DebugSerial.print(crypto_processTicks/100);
         DebugSerial.println(" ticks");
-        lea_samples = 0;
-        lea_processTime = 0;
-        lea_processTicks = 0;
+        crypto_samples = 0;
+        crypto_processTime = 0;
+        crypto_processTicks = 0;
     }
     if (ret == -1)
     {
@@ -1932,8 +1929,12 @@ void setup()
         }
 
 #if defined(USE_CRYPTO)
-        lea_gcm.init();
-        ascon.init();
+  crypto = &ascon;
+  #if defined(USE_CRYPTO_KEY_EXCHANGE)
+    crypto->init(K, K_len, A, A_len, N, N_len);
+  #else
+    crypto->init();
+  #endif
 #endif
     }
 

@@ -3,6 +3,7 @@
 #include "OTA.h"
 #include "device.h"
 #include <cstdint>
+#include "crypto.h"
 
 extern "C"
 {
@@ -23,7 +24,7 @@ extern "C"
 
 /*  LEA GCM encryption and decryption
  */
-class GCM
+class GCM : public Crypto
 {
 private:
     GCM_st gcm_TX;
@@ -46,6 +47,8 @@ private:
     uint32_t getPayloadLen(const uint8_t *data);
 
     void increment_nonce_counter(uint8_t *nonce);
+    void increase_nonce_counter_up_to_32bits_increment(uint8_t *nonce, uint32_t increment);
+
 
     // Measurement of lea encryption and decryption time
     uint32_t  start[3];
@@ -55,9 +58,18 @@ private:
 public:
     GCM();
     int init();
-    int init(uint8_t *K_, size_t K_len_, uint8_t *A_, size_t A_len_, uint8_t *N_, size_t N_len_);
-    int encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen);       // otaPktPtr -> data
-    int decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen); // data --> otaPktPtr
+    // int init(uint8_t *K_, size_t K_len_, uint8_t *A_, size_t A_len_, uint8_t *N_, size_t N_len_);
+    int init(const uint8_t* K_, uint32_t K_len_, const uint8_t* A_, uint32_t A_len_, uint8_t *N_, size_t N_len_);
+
+  int encrypt(const uint8_t *plaintext, int plaintext_len, uint8_t *ciphertext); // plaintext to data
+  int decrypt(const uint8_t *ciphertext, uint8_t ciphertext_len, uint8_t *plaintext); // ciphertext ->  plaintext
+
+  int encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen); // otaPktPtr -> data
+  int decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen); // data --> otaPktPtr
+
+    // int encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen);       // otaPktPtr -> data
+    // int decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen); // data --> otaPktPtr
+
     void reset();
     int counter() { return COUNTER_RX; };
 

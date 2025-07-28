@@ -2,6 +2,7 @@
 
 #include "OTA.h"
 #include <cstdint>
+#include "crypto.h"
 
 extern "C"
 {
@@ -15,7 +16,8 @@ extern "C"
 #define  ARM_CM_DWT_CYCCNT (*(uint32_t *)0xE0001004)
 
 
-class Ascon128 {
+class Ascon128 : public Crypto
+{
 private:
   ASCON_st ascon_TX;
   ASCON_st ascon_RX;
@@ -48,8 +50,8 @@ public:
 
   int init();
 
-  int init(const uint8_t* K_, uint32_t K_len_, 
-                   const uint8_t* A_, uint32_t A_len_, 
+  int init(const uint8_t* K_, uint32_t K_len_,
+                   const uint8_t* A_, uint32_t A_len_,
                    uint8_t *N_, size_t N_len_);
 
   void increment_nonce_counter(uint8_t *nonce);
@@ -58,7 +60,7 @@ public:
   int encrypt(const uint8_t *plaintext, int plaintext_len, uint8_t *ciphertext); // plaintext to data
   int decrypt(const uint8_t *ciphertext, uint8_t ciphertext_len, uint8_t *plaintext); // ciphertext ->  plaintext
 
-  int encrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen); // otaPktPtr -> data
+  int encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen); // otaPktPtr -> data
   int decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen); // data --> otaPktPtr
 
     int counter() { return COUNTER_RX; };

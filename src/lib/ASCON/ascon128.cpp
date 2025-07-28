@@ -177,7 +177,7 @@ int Ascon128::decrypt(const uint8_t *ciphertext, uint8_t ciphertext_len, uint8_t
   return plaintext_len;
 }
 
-int Ascon128::encrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen) {
+int Ascon128::encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen) {
         int ret = 0;
 
         DebugSerial.print("plaintext: ");

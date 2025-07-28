@@ -83,10 +83,12 @@ uint8_t CRSFinBuffer[CRSF_MAX_PACKET_LEN+1];
 #if defined(USE_CRYPTO)
 GCM lea_gcm;
 Ascon128 ascon;
-volatile unsigned long lea_elapsedTime;
-volatile unsigned long lea_processTime = 0;
-volatile unsigned long lea_processTicks = 0;
-volatile unsigned int lea_samples = 0;
+Crypto* crypto = nullptr;
+
+volatile unsigned long crypto_elapsedTime;
+volatile unsigned long crypto_processTime = 0;
+volatile unsigned long crypto_processTicks = 0;
+volatile unsigned int crypto_samples = 0;
 
 #if defined(USE_CRYPTO_KEY_EXCHANGE)
 TxHandshakeClass TxHandshake;
@@ -210,8 +212,7 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
   uint8_t plaintext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = {0};
   int ret = 0;
 
-  // ret = lea_gcm.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
-  ret = ascon.decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
+  ret = crypto->decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
   if (ret == -1)
   {
       DBGLN("LEA GCM decrypt error");
@@ -663,27 +664,25 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
   //   DebugSerial.println();
   // }
 
-  lea_elapsedTime = micros();
-  // ret = lea_gcm.encrypt(&otaPkt, ciphertext, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
-  ret = ascon.encrypt(&otaPkt, ciphertext, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
+  crypto_elapsedTime = micros();
+  ret = crypto->encrypt(&otaPkt, ciphertext, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
 
   // for debugging ascon
   //uint8_t plaintext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = {0};
-  //ascon.decrypt(&otaPkt, plaintext, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE); // for debugging
+  //crypto->decrypt(&otaPkt, plaintext, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE); // for debugging
 
-  lea_processTime += micros() - lea_elapsedTime;
-  // lea_processTicks += lea_gcm.encryption_time();
-  lea_processTicks += ascon.encryption_time();
-  lea_samples++;
-  if (lea_samples == 100) {
+  crypto_processTime += micros() - crypto_elapsedTime;
+  crypto_processTicks += crypto->encryption_time();
+  crypto_samples++;
+  if (crypto_samples == 100) {
     DebugSerial.print("TX average time of encryption: ");
-    DebugSerial.print(lea_processTime/100);
+    DebugSerial.print(crypto_processTime/100);
     DebugSerial.print(" us, ");
-    DebugSerial.print(lea_processTicks/100);
+    DebugSerial.print(crypto_processTicks/100);
     DebugSerial.println(" ticks");
-    lea_samples = 0;
-    lea_processTime = 0;
-    lea_processTicks = 0;
+    crypto_samples = 0;
+    crypto_processTime = 0;
+    crypto_processTicks = 0;
   }
   if (ret == -1)
   {
@@ -1497,12 +1496,11 @@ void setup()
   }
 
 #if defined(USE_CRYPTO)
+  crypto = &ascon;
   #if defined(USE_CRYPTO_KEY_EXCHANGE)
-    // lea_gcm.init(K, K_len, A, A_len, N, N_len);
-    ascon.init(K, K_len, A, A_len, N, N_len);
+    crypto->init(K, K_len, A, A_len, N, N_len);
   #else
-    // lea_gcm.init();
-    ascon.init();
+    crypto->init();
   #endif
 #endif
   // config.SetTlm(TLM_RATIO_1_2); // Force TLM ratio of 1:2 for balanced bi-dir link
