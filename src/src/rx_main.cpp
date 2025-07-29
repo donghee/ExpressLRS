@@ -358,7 +358,7 @@ void SetRFLinkRate(uint8_t index) // Set speed of RF link
     interval = interval * 12 / 10; // increase the packet interval by 20% to allow adding packet header
 #endif
 #if defined(USE_CRYPTO) && defined(RADIO_SX128X)
-    interval = interval * 14.5 / 10; // increase the packet interval by 35% to allow adding lea packet header
+    interval = interval * 13.75 / 10; // increase the packet interval by 35% to allow adding lea packet header
                                      // Why 45%? It is as follows. addtional lea packet is more than 30%, so add 40% to the original interval.
 #endif
     hwTimer::updateInterval(interval);

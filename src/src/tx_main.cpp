@@ -407,7 +407,7 @@ void SetRFLinkRate(uint8_t index) // Set speed of RF link (hz)
   interval = interval * 12 / 10; // increase the packet interval by 20% to allow adding packet header
 #endif
 #if defined(USE_CRYPTO) && defined(RADIO_SX128X)
-  interval = interval * 14.5 / 10; // increase the packet interval by 45% to allow adding lea packet header
+  interval = interval * 13.75 / 10; // increase the packet interval by 45% to allow adding lea packet header
 #endif
   hwTimer::updateInterval(interval);
   Radio.Config(ModParams->bw, ModParams->sf, ModParams->cr, GetInitialFreq(),
