@@ -22,8 +22,9 @@
 #include "devBackpack.h"
 #include "gcm.h"
 #include "ascon128.h"
-#include "tx_handshake.h"
 #include "uECDH.h"
+#include "tx_handshake_ecdh.h"
+// #include "tx_handshake.h"
 
 //// CONSTANTS ////
 #define MSP_PACKET_SEND_INTERVAL 10LU
@@ -1421,6 +1422,10 @@ void reconfigureCrypto()
   }
 
   #if defined(USE_CRYPTO_KEY_EXCHANGE)
+    uint8_t K[16] = {0}; uint8_t A[16] = {0}; uint8_t N[16] = {0};
+    size_t K_len = 0; size_t A_len = 0; size_t N_len = 0;
+
+    TxHandshake.LeaKey(K, K_len, A, A_len, N, N_len);
     crypto->init(K, K_len, A, A_len, N, N_len);
   #else
     crypto->init();
@@ -1431,10 +1436,7 @@ void reconfigureCrypto()
 void setup()
 {
 #if defined(USE_CRYPTO) && defined(USE_CRYPTO_KEY_EXCHANGE)
-  // LEA key
-  uint8_t K[16] = {0}; uint8_t A[16] = {0}; uint8_t N[16] = {0};
-  size_t K_len = 0; size_t A_len = 0; size_t N_len = 0;
-
+  setupSerial();
   SX12XX_Radio_Number_t transmittingRadio = Radio.GetLastSuccessfulPacketRadio();
 
   pinMode(GPIO_PIN_LED, OUTPUT);
@@ -1452,8 +1454,6 @@ void setup()
   while (!TxHandshake.IsDone()) {
     TxHandshake.DoHandle();
   }
-
-  TxHandshake.LeaKey(K, K_len, A, A_len, N, N_len);
 #endif
 
   if (setupHardwareFromOptions())

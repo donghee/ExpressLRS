@@ -37,7 +37,9 @@
 #include "devMSPVTX.h"
 #include "gcm.h"
 #include "ascon128.h"
-#include "rx_handshake.h"
+#include "uECDH.h"
+#include "rx_handshake_ecdh.h"
+// #include "rx_handshake.h"
 
 #if defined(PLATFORM_ESP8266)
 #include <user_interface.h>
@@ -1514,6 +1516,10 @@ void reconfigureCrypto()
   }
 
   #if defined(USE_CRYPTO_KEY_EXCHANGE)
+    uint8_t K[16] = {0}; uint8_t A[16] = {0}; uint8_t N[16] = {0};
+    size_t K_len = 0; size_t A_len = 0; size_t N_len = 0;
+
+    RxHandshake.LeaKey(K, K_len, A, A_len, N, N_len);
     crypto->init(K, K_len, A, A_len, N, N_len);
   #else
     crypto->init();
@@ -1870,6 +1876,7 @@ void resetConfigAndReboot()
 void setup()
 {
 #if defined(USE_CRYPTO) && defined(USE_CRYPTO_KEY_EXCHANGE)
+  setupSerial();
   delay(4000); // When using LEA key exchange, the RX must be powered up after the TX
                // Wait up to 3~4 seconds(TX red LED turns on) after hearing the 'WELCOME TO EDGE TX' message from RC transmitter and then power up the RX radio.
   Radio.Begin();
