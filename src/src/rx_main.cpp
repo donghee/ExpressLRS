@@ -916,6 +916,26 @@ static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPkt
     else
     {
         telemetryConfirmValue = OtaUnpackChannelData(otaPktPtr, ChannelData, ExpressLRS_currTlmDenom);
+
+        uint8_t rcdata_ciphertext[10] = {0};
+        uint8_t rcdata_ciphertext_len = 0;
+        uint8_t rcdata_plaintext_len = 0;
+        uint8_t rcdata_plaintext[6] = {0};
+        OTA_Packet_s otaPkt = {0};
+        memcpy(&otaPkt, otaPktPtr, sizeof(OTA_Packet_s));
+        memcpy(rcdata_ciphertext, otaPktPtr->full.rc_encrypted.raw, sizeof(otaPktPtr->full.rc_encrypted.raw));
+        if (crypto)
+        {
+          rcdata_plaintext_len = crypto->decrypt(rcdata_ciphertext, sizeof(rcdata_ciphertext), rcdata_plaintext);
+          if (rcdata_plaintext_len == -1)
+          {
+            DBGLN("RC data decryption failed");
+            return;
+          }
+
+          memcpy(&otaPkt.full.rc_encrypted.raw[2], rcdata_plaintext, rcdata_plaintext_len);
+        }
+
         // DebugSerial.print("otaPkt rc encrypted raw: ");
         // for (uint8_t i = 0 ; i < 8; i++)
         // {
@@ -923,10 +943,9 @@ static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPkt
         //   DebugSerial.print(" ");
         // }
         // DebugSerial.println();
-        // DebugSerial.print("ChannelData CH5-CH12: ");
-        // DebugSerial.println(otaPktPtr->full.rc_encrypted.raw[7], BIN);
         DebugSerial.print("ChannelData: ");
-        telemetryConfirmValue = OtaUnpackChannelData_RCDATA_decrypted_AIO(otaPktPtr, ChannelData, ExpressLRS_currTlmDenom);
+
+        telemetryConfirmValue = OtaUnpackChannelData_RCDATA_decrypted_AIO(&otaPkt, ChannelData, ExpressLRS_currTlmDenom);
         for (uint8_t i = 0; i < 9; i++)
         {
             DebugSerial.print(ChannelData[i]);

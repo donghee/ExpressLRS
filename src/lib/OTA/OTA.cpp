@@ -294,24 +294,16 @@ void PackUInt11ToChannels4x2(const crsf_channels_t* src, uint8_t* destChannels4x
     }
 }
 
-void OtaPackChannelData_RCDATA_encrypted_AIO(OTA_Packet_s * const otaPkt, const uint32_t *channelData, bool telemetryStatus, uint8_t tlmDenom)
+void OtaPackChannelData_RCDATA_encrypted_AIO(uint8_t * rcdata, const uint32_t *channelData, bool telemetryStatus, uint8_t tlmDenom, uint8_t isHighAux)
 {
-  static uint16_t counter = 0;
   OTA_Channels_4x10 tempChannels;
-  DebugSerial.print("ChannelData: ");
-  for (int i = 0; i < 9; i++) {
-      DebugSerial.print(channelData[i]);
-      DebugSerial.print(" ");
-  }
-  DebugSerial.println();
-  PackUInt11ToChannels4x10(&channelData[0], &tempChannels, &Decimate11to10_Div2);
-
-  // DebugSerial.print("OTAPack channels: ");
-  // for (int i = 0; i < sizeof(OTA_Channels_4x10); i++) {
-  //     DebugSerial.print(tempChannels.raw[i]);
+  // DebugSerial.print("ChannelData: ");
+  // for (int i = 0; i < 9; i++) {
+  //     DebugSerial.print(channelData[i]);
   //     DebugSerial.print(" ");
   // }
   // DebugSerial.println();
+  PackUInt11ToChannels4x10(&channelData[0], &tempChannels, &Decimate11to10_Div2);
 
   uint8_t channelData_ch5_ch12;
   crsf_channels_t crsf_channelData_ch5_ch12;
@@ -324,32 +316,10 @@ void OtaPackChannelData_RCDATA_encrypted_AIO(OTA_Packet_s * const otaPkt, const 
   crsf_channelData_ch5_ch12.ch11 = channelData[11];
   crsf_channelData_ch5_ch12.ch12 = channelData[12];
 
-  PackUInt11ToChannels4x2(&crsf_channelData_ch5_ch12, &channelData_ch5_ch12, otaPkt->full.rc_encrypted.isHighAux);
+  PackUInt11ToChannels4x2(&crsf_channelData_ch5_ch12, &channelData_ch5_ch12, isHighAux);
 
-  uint8_t rc_encrypted_raw[8] = {0};
-  counter++;
-  rc_encrypted_raw[0] = (counter >> 8) & 0xFF; // High byte of the counter
-  rc_encrypted_raw[1] = (counter & 0xFF); // Low byte of the counter
-  memcpy(&rc_encrypted_raw[2], &tempChannels.raw[0], sizeof(OTA_Channels_4x10));
-  rc_encrypted_raw[7] = channelData_ch5_ch12; // Pack the high channels (CH5-CH12) into the last byte
-  memcpy(&otaPkt->full.rc_encrypted.raw, rc_encrypted_raw, sizeof(rc_encrypted_raw));
-
-  otaPkt->full.rc_encrypted.ch4 = CRSF_to_BIT(ChannelData[4]);
-
-  // otaPkt->full.rc_encrypted.packetType = PACKET_TYPE_RCDATA;
-  //otaPkt->full.rc_encrypted.securityType = securityType;
-  //otaPkt->full.rc_encrypted.free = 0;
-  // otaPkt->full.rc_encrypted.telemetryStatus = telemetryStatus;
-  // otaPkt->full.rc_encrypted.uplinkPower = constrain(CRSF::LinkStatistics.uplink_TX_Power, 1, 8) - 1;
-  //otaPkt->full.rc_encrypted.isHighAux = 0;
-  // otaPkt->full.rc_encrypted.ch4 = CRSF_to_BIT(channelData[4]);
-
-  // 4 bits Packet Counter for Encrypted Channel Data to prevent replay attacks
-  // COUNTER_4b = (COUNTER_4b + 1) % 16;
-  // ChannelDataEncrypted[1] = (COUNTER_4b << 4) | (ChannelDataEncrypted[1] & 0x0F);
-
-  // If the channel data is encrypted, copy the channel data to the encrypted buffer
-  // memcpy(&otaPkt.full.rc_encrypted.raw, ChannelDataEncrypted+1, 10);
+  memcpy(&rcdata[0], &tempChannels.raw[0], sizeof(OTA_Channels_4x10));
+  rcdata[5] = channelData_ch5_ch12; // Pack the high channels (CH5-CH12) into the last byte
 }
 
 static bool FullResIsHighAux;

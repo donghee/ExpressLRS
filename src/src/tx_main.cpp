@@ -577,14 +577,33 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
       {
         injectBackpackPanTiltRollData(now);
         OtaPackChannelData(&otaPkt, ChannelData, TelemetryReceiver.GetCurrentConfirm(), ExpressLRS_currTlmDenom);
-        OtaPackChannelData_RCDATA_encrypted_AIO(&otaPkt, ChannelData, TelemetryReceiver.GetCurrentConfirm(), ExpressLRS_currTlmDenom);
-        // DebugSerial.print("otaPkt rc encrypted raw: ");
-        // for (uint8_t i = 0 ; i < 8; i++)
-        // {
-        //   DebugSerial.print(otaPkt.full.rc_encrypted.raw[i], HEX);
-        //   DebugSerial.print(" ");
-        // }
-        // DebugSerial.println();
+
+        uint8_t rcdata_plaintext[6] = {0};
+        uint8_t rcdata_ciphertext[10] = {0};
+        uint8_t rcdata_ciphertext_len = 0;
+
+        OtaPackChannelData_RCDATA_encrypted_AIO(rcdata_plaintext, ChannelData,
+                                                TelemetryReceiver.GetCurrentConfirm(),
+                                                ExpressLRS_currTlmDenom, otaPkt.full.rc_encrypted.isHighAux);
+        otaPkt.full.rc_encrypted.ch4 = CRSF_to_BIT(ChannelData[4]);
+        if (crypto)
+        {
+          rcdata_ciphertext_len = crypto->encrypt(rcdata_plaintext, sizeof(rcdata_plaintext), rcdata_ciphertext);
+          if (rcdata_ciphertext_len == -1)
+          {
+            DBGLN("RC data encryption failed");
+            return;
+          }
+          memcpy(otaPkt.full.rc_encrypted.raw, rcdata_ciphertext, rcdata_ciphertext_len);
+        }
+
+        DebugSerial.print("otaPkt rc encrypted raw: ");
+        for (uint8_t i = 0 ; i < 8; i++)
+        {
+          DebugSerial.print(otaPkt.full.rc_encrypted.raw[i], HEX);
+          DebugSerial.print(" ");
+        }
+        DebugSerial.println();
       }
     }
   }

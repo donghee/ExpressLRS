@@ -3,6 +3,8 @@
 
 #include <fstream>
 
+extern HardwareSerial DebugSerial;
+
 GCM::GCM()
 {
 }
@@ -106,44 +108,13 @@ int GCM::init()
     return 0;
 }
 
-// TX
-//int GCM::encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen) // ota to data
-int GCM::encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen) // otaPktPtr -> data
+int GCM::decrypt(const uint8_t *ciphertext, uint8_t ciphertext_len, uint8_t *plaintext) // ciphertext ->  plaintext
 {
     int result;
-
-    result = GCM4LEA_set_enc_params(&gcm_TX, (uint8_t *)otaPktPtr, OTA8_PACKET_SIZE, N, 12);
-    if (result < 0) {
-        return -1;
-    }
-
-    start[1] = ARM_CM_DWT_CYCCNT;
-    result =  GCM4LEA_enc(&gcm_TX);
-    stop[1] = ARM_CM_DWT_CYCCNT;
-    if (result < 0) {
-        return -1;
-    }
+    uint32_t plaintext_len = ciphertext_len - (2 + 2);
 
     // counter up
-    COUNTER_TX = (COUNTER_TX + 1) % 65536;
-    increment_nonce_counter(N);
-
-    data[0] = (uint8_t)(COUNTER_TX >> 8); // 2 bytes
-    data[1] = (uint8_t)COUNTER_TX;
-    memcpy((uint8_t *)data + 2, gcm_TX.T, 2);
-    memcpy((uint8_t *)data + 4, gcm_TX.CC, OTA8_PACKET_SIZE);
-
-    return 0;
-}
-
-// RX
-//int GCM::decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen) // data --> otaPktPtr
-int GCM::decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen) // data --> otaPktPtr
-{
-    int result;
-
-    // counter up
-	COUNTER_RX_new = (data[0] << 8) | data[1]; // 2 bytes
+	COUNTER_RX_new = (ciphertext[0] << 8) | ciphertext[1]; // 2 bytes
 	COUNTER_RX_gap = (COUNTER_RX_new - COUNTER_RX + 65536) % 65536;
 
   	// [Note] 만일 COUNTER_RX_gap = 0이면 초기화 직후 송수신으로 판별할 수 있음 (0이 반복되는 경우에도 정상적인 상황이 아니기 때문에 이에 대한 처리도 필요함!!!!!!!!!)
@@ -167,8 +138,8 @@ int GCM::decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen) 
 		// 초기화, 비정상적인 상황에 대한 예외처리
 	}
 
-    // Tbits = 16 for nonce sync, so data + 2 is pointer of gcm_RX.T
-   	result =  GCM4LEA_set_dec_params(&gcm_RX, data + 4, OTA8_PACKET_SIZE, N, 12, data + 2);
+    // Tbits = 16 for nonce sync, so ciphertext + 2 is pointer of gcm_RX.T
+   	result =  GCM4LEA_set_dec_params(&gcm_RX, ciphertext + 4, plaintext_len, N, 12, ciphertext + 2);
     if (result < 0) {
         return -1;
     }
@@ -180,13 +151,51 @@ int GCM::decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen) 
         return -1;
     }
 
-    memcpy((uint8_t *)otaPktPtr, (uint8_t *)gcm_RX.PP, OTA8_PACKET_SIZE);
+    memcpy((uint8_t *)plaintext, (uint8_t *)gcm_RX.PP, plaintext_len);
 
-    return 0;
+    return plaintext_len;
 }
 
 int GCM::encrypt(const uint8_t *plaintext, int plaintext_len, uint8_t *ciphertext) // plaintext to data
-{   return 0; }
+{
+    int result;
 
-int GCM::decrypt(const uint8_t *ciphertext, uint8_t ciphertext_len, uint8_t *plaintext) // ciphertext ->  plaintext
-{   return 0; }
+    result = GCM4LEA_set_enc_params(&gcm_TX, (uint8_t *)plaintext, plaintext_len, N, 12);
+    if (result < 0) {
+        return -1;
+    }
+
+    start[1] = ARM_CM_DWT_CYCCNT;
+    result =  GCM4LEA_enc(&gcm_TX);
+    stop[1] = ARM_CM_DWT_CYCCNT;
+    if (result < 0) {
+        return -1;
+    }
+
+    // counter up
+    COUNTER_TX = (COUNTER_TX + 1) % 65536;
+    increment_nonce_counter(N);
+
+    ciphertext[0] = (uint8_t)(COUNTER_TX >> 8); // 2 bytes
+    ciphertext[1] = (uint8_t)COUNTER_TX;
+    memcpy((uint8_t *)ciphertext + 2, gcm_TX.T, 2);
+    memcpy((uint8_t *)ciphertext + 4, gcm_TX.CC, plaintext_len);
+
+    return 2 + 2 + gcm_TX.CC_byte_length; // 2 bytes for counter + 2 bytes for T + ciphertext
+}
+
+// RX
+int GCM::decrypt(OTA_Packet_s *otaPktPtr, const uint8_t *data, uint8_t dataLen) // data --> otaPktPtr
+{
+    int ret = 0;
+    ret = this->decrypt((uint8_t *)data, dataLen, (uint8_t *)otaPktPtr);
+    return ret;
+}
+
+// TX
+int GCM::encrypt(OTA_Packet_s *otaPktPtr, uint8_t *data, uint8_t dataLen) // otaPktPtr -> data
+{
+    int ret = 0;
+    ret = this->encrypt((uint8_t *)otaPktPtr, sizeof(OTA_Packet_s), (uint8_t *)data);
+    return ret;
+}

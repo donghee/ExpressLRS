@@ -183,7 +183,7 @@ extern GeneratePacketCrc_t OtaGeneratePacketCrc;
 #if defined(TARGET_TX) || defined(UNIT_TEST)
 typedef void (*PackChannelData_t)(OTA_Packet_s * const otaPktPtr, const uint32_t *channelData, bool TelemetryStatus, uint8_t tlmDenom);
 extern PackChannelData_t OtaPackChannelData;
-void OtaPackChannelData_RCDATA_encrypted_AIO(OTA_Packet_s * const otaPkt, const uint32_t *channelData, bool telemetryStatus, uint8_t tlmDenom);
+void OtaPackChannelData_RCDATA_encrypted_AIO(uint8_t * rcdata, const uint32_t *channelData, bool telemetryStatus, uint8_t tlmDenom, uint8_t isHighAux);
 #if defined(UNIT_TEST)
 void OtaSetHybrid8NextSwitchIndex(uint8_t idx);
 void OtaSetFullResNextChannelSet(bool next);
