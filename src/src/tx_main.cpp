@@ -208,25 +208,7 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
     return false;
   }
 
-#if defined(USE_CRYPTO)
-  OTA_Packet_s * otaPktPtr = (OTA_Packet_s * const)Radio.RXdataBuffer;
-  if (config.GetSecurity() > 0)
-  {
-    uint8_t plaintext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = {0};
-    int ret = 0;
-
-    ret = crypto->decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
-    if (ret == -1)
-    {
-        DBGLN("decrypt error");
-        return false;
-    }
-
-    otaPktPtr = (OTA_Packet_s * const)plaintext;
-  }
-#else
   OTA_Packet_s * const otaPktPtr = (OTA_Packet_s * const)Radio.RXdataBuffer;
-#endif
   if (!OtaValidatePacketCrc(otaPktPtr))
   {
     DBGLN("TLM crc error");
@@ -509,6 +491,24 @@ void injectBackpackPanTiltRollData(uint32_t const now)
 #endif
 }
 
+void OtaPackChannelDataEncrypted_AIO(OTA_Packet_s * const otaPkt, uint16_t * const channelData, bool telemetryStatus, uint8_t tlmDenom)
+{
+  otaPkt->full.rc_encrypted.packetType = PACKET_TYPE_RCDATA;
+  otaPkt->full.rc_encrypted.securityType = securityType;
+  otaPkt->full.rc_encrypted.free = 0;
+  // otaPkt->full.rc_encrypted.telemetryStatus = telemetryStatus;
+  // otaPkt->full.rc_encrypted.uplinkPower = constrain(CRSF::LinkStatistics.uplink_TX_Power, 1, 8) - 1;
+  otaPkt->full.rc_encrypted.isHighAux = 0;
+  otaPkt->full.rc_encrypted.ch4 = CRSF_to_BIT(channelData[4]);
+
+  // 4 bits Packet Counter for Encrypted Channel Data to prevent replay attacks
+  // COUNTER_4b = (COUNTER_4b + 1) % 16;
+  // ChannelDataEncrypted[1] = (COUNTER_4b << 4) | (ChannelDataEncrypted[1] & 0x0F);
+
+  // If the channel data is encrypted, copy the channel data to the encrypted buffer
+  // memcpy(&otaPkt.full.rc_encrypted.raw, ChannelDataEncrypted+1, 10);
+}
+
 void ICACHE_RAM_ATTR SendRCdataToRF()
 {
   uint32_t const now = millis();
@@ -596,22 +596,24 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
         injectBackpackPanTiltRollData(now);
         OtaPackChannelData(&otaPkt, ChannelData, TelemetryReceiver.GetCurrentConfirm(), ExpressLRS_currTlmDenom);
 
-        if (securityType != 0) { // 0 = no encryption, 1 = lea, 2 = ascon
-          otaPkt.full.rc_encrypted.packetType = PACKET_TYPE_RCDATA;
-          otaPkt.full.rc_encrypted.securityType = securityType;
-          otaPkt.full.rc_encrypted.free = 0;
-          // otaPkt.full.rc.telemetryStatus = TelemetryReceiver.GetCurrentConfirm();
-          // otaPkt.full.rc_encrypted.uplinkPower = constrain(CRSF::LinkStatistics.uplink_TX_Power, 1, 8) - 1;
-          otaPkt.full.rc_encrypted.isHighAux = 0;
-          otaPkt.full.rc_encrypted.ch4 = CRSF_to_BIT(ChannelData[4]);
-
-          // 4 bits Packet Counter for Encrypted Channel Data to prevent replay attacks
-          COUNTER_4b = (COUNTER_4b + 1) % 16;
-          ChannelDataEncrypted[1] = (COUNTER_4b << 4) | (ChannelDataEncrypted[1] & 0x0F);
-
-          // If the channel data is encrypted, copy the channel data to the encrypted buffer
-          memcpy(&otaPkt.full.rc_encrypted.raw, ChannelDataEncrypted+1, 10);
-        }
+        // if (config.GetSecurity() != 0) { // 0 = no encryption, 1 = lea, 2 = ascon
+        //   otaPkt.full.rc_encrypted.packetType = PACKET_TYPE_RCDATA;
+        //   otaPkt.full.rc_encrypted.securityType = securityType;
+        //   otaPkt.full.rc_encrypted.free = 0;
+        //   // otaPkt.full.rc.telemetryStatus = TelemetryReceiver.GetCurrentConfirm();
+        //   // otaPkt.full.rc_encrypted.uplinkPower = constrain(CRSF::LinkStatistics.uplink_TX_Power, 1, 8) - 1;
+        //   otaPkt.full.rc_encrypted.isHighAux = 0;
+        //   otaPkt.full.rc_encrypted.ch4 = CRSF_to_BIT(ChannelData[4]);
+        //
+        //   // 4 bits Packet Counter for Encrypted Channel Data to prevent replay attacks
+        //   COUNTER_4b = (COUNTER_4b + 1) % 16;
+        //   // ChannelDataEncrypted[1] = (COUNTER_4b << 4) | (ChannelDataEncrypted[1] & 0x0F);
+        //
+        //   // If the channel data is encrypted, copy the channel data to the encrypted buffer
+        //   // memcpy(&otaPkt.full.rc_encrypted.raw, ChannelDataEncrypted+1, 10);
+        //
+        //   // OtaPackChannelDataEncrypted_AIO(&otaPkt, ChannelDataEncrypted, ExpressLRS_currTlmDenom);
+        // }
       }
     }
   }
@@ -656,60 +658,7 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
   }
 #endif
 
-#if defined(USE_CRYPTO)
-if (config.GetSecurity() > 0)
-{
-  uint8_t ciphertext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = { 0 };
-  int ret = 0;
-
-  // if (otaPkt.std.type == PACKET_TYPE_RCDATA) {
-  //   DebugSerial.print("TX RC Data: ");
-  //   for (int i = 1; i < OTA8_PACKET_SIZE; i++) { // first byte is the packet type
-  //     DebugSerial.printf("0x%02x ", ((const unsigned char *)&otaPkt)[i]);
-  //   }
-  //   DebugSerial.println();
-  // }
-
-  crypto_elapsedTime = micros();
-  ret = crypto->encrypt(&otaPkt, ciphertext, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
-
-  // for debugging ascon
-  //uint8_t plaintext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = {0};
-  //crypto->decrypt(&otaPkt, plaintext, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE); // for debugging
-
-  crypto_processTime += micros() - crypto_elapsedTime;
-  crypto_processTicks += crypto->encryption_time();
-  crypto_samples++;
-  if (crypto_samples == 100) {
-    if (config.GetSecurity() == 1) {
-      DebugSerial.print("LEA-GCM: ");
-    } else if (config.GetSecurity() == 2) {
-      DebugSerial.print("ASCON: ");
-    }
-    DebugSerial.print("TX average time of encryption: ");
-    DebugSerial.print(crypto_processTime/100);
-    DebugSerial.print(" us, ");
-    DebugSerial.print(crypto_processTicks/100);
-    DebugSerial.println(" ticks");
-    crypto_samples = 0;
-    crypto_processTime = 0;
-    crypto_processTicks = 0;
-  }
-  if (ret == -1)
-  {
-    DBGLN("encrypt error");
-    return;
-  }
-
-  Radio.TXnb((uint8_t*)ciphertext, sizeof(ciphertext), transmittingRadio);
-}
-else
-{
   Radio.TXnb((uint8_t*)&otaPkt, ExpressLRS_currAirRate_Modparams->PayloadLength, transmittingRadio);
-}
-#else
-  Radio.TXnb((uint8_t*)&otaPkt, ExpressLRS_currAirRate_Modparams->PayloadLength, transmittingRadio);
-#endif
 }
 
 void ICACHE_RAM_ATTR nonceAdvance()

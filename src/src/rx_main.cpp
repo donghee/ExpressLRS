@@ -37,9 +37,7 @@
 #include "devMSPVTX.h"
 #include "gcm.h"
 #include "ascon128.h"
-#include "uECDH.h"
 #include "rx_handshake_ecdh.h"
-// #include "rx_handshake.h"
 
 #if defined(PLATFORM_ESP8266)
 #include <user_interface.h>
@@ -547,27 +545,7 @@ bool ICACHE_RAM_ATTR HandleSendTelemetryResponse()
         transmittingRadio = SX12XX_Radio_NONE;
     }
 
-#if defined(USE_CRYPTO)
-  if (config.GetSecurity() > 0)
-  {
-    int ret = 0;
-    uint8_t ciphertext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = { 0 };
-    ret = crypto->encrypt(&otaPkt, ciphertext, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
-    if (ret == -1)
-    {
-      DBGLN("encrypt error");
-      return false;
-    }
-
-    Radio.TXnb(ciphertext, sizeof(ciphertext), transmittingRadio);
-  }
-  else
-  {
     Radio.TXnb((uint8_t*)&otaPkt, ExpressLRS_currAirRate_Modparams->PayloadLength, transmittingRadio);
-  }
-#else
-    Radio.TXnb((uint8_t*)&otaPkt, ExpressLRS_currAirRate_Modparams->PayloadLength, transmittingRadio);
-#endif
 
     return true;
 }
@@ -903,6 +881,23 @@ bool ICACHE_RAM_ATTR UnpackChannelDataEncrypted(OTA_Packet_s const * const otaPk
     return ota8->rc.telemetryStatus;
 }
 
+bool ICACHE_RAM_ATTR OtaUnpackChannelData_AIO(OTA_Packet_s const * const otaPktPtr, uint8_t *channelData, uint8_t const tlmDenom)
+{
+    (void)tlmDenom;
+
+    OTA_Packet8_s const * const ota8 = (OTA_Packet8_s const * const)otaPktPtr;
+    uint8_t rcDecrypted[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = { 0 };
+    // crypto->decrypt(ota8.full.rc_encrypted.raw, rcDecrypted, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
+    // rc decrypted to channelData
+
+    memcpy(channelData, ota8, 11); // TODO - this is a hack, we should be able to copy the whole packet
+    ChannelData[4] = BIT_to_CRSF(ota8->rc.ch4);
+
+    // Restore the uplink_TX_Power range 0-7 -> 1-8
+    CRSF::updateUplinkPower(ota8->rc.uplinkPower + 1);
+    return ota8->rc.telemetryStatus;
+}
+
 static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPktPtr)
 {
     // Must be fully connected to process RC packets, prevents processing RC
@@ -915,6 +910,7 @@ static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPkt
     if (otaPktPtr->full.rc_encrypted.securityType >= 1 && otaPktPtr->full.rc_encrypted.free == 0 && otaPktPtr->full.rc_encrypted.isHighAux == 0)
     {
         telemetryConfirmValue = UnpackChannelDataEncrypted(otaPktPtr, ChannelDataEncrypted, ExpressLRS_currTlmDenom);
+        // telemetryConfirmValue = OtaUnpackChannelData_AIO(otaPktPtr, ChannelData, ExpressLRS_currTlmDenom); // AIO
         securityType = otaPktPtr->full.rc_encrypted.securityType;
     }
     else
@@ -1079,52 +1075,7 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
     }
     uint32_t const beginProcessing = micros();
 
-#if defined(USE_CRYPTO)
-  OTA_Packet_s * otaPktPtr = (OTA_Packet_s * const)Radio.RXdataBuffer;
-  uint8_t plaintext[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = {0};
-  int ret = 0;
-  if (config.GetSecurity() > 0)
-  {
-    // Print encrypted data for demo at 2024. 06
-    // DebugSerial.write(0xC8); // sync byte
-    // DebugSerial.write(0x18); // length
-    // DebugSerial.write(0x16); // encrypted rc channel
-    // for (int i = 0; i < 20; i++) {
-    //   DebugSerial.write(Radio.RXdataBuffer[i]);
-    // }
-
-    // decrypt the packet
-    crypto_elapsedTime = micros();
-    ret = crypto->decrypt((OTA_Packet_s *) plaintext, (const uint8_t *) Radio.RXdataBuffer, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
-    crypto_processTime += micros() - crypto_elapsedTime;
-    crypto_processTicks += crypto->decryption_time();
-    crypto_samples++;
-    if (crypto_samples == 100) {
-        if (config.GetSecurity() == 1) {
-          DebugSerial.print("LEA-GCM: ");
-        } else if (config.GetSecurity() == 2) {
-          DebugSerial.print("ASCON: ");
-        }
-        DebugSerial.print("RX average time of decryption: ");
-        DebugSerial.print(crypto_processTime/100);
-        DebugSerial.print(" us, ");
-        DebugSerial.print(crypto_processTicks/100);
-        DebugSerial.println(" ticks");
-        crypto_samples = 0;
-        crypto_processTime = 0;
-        crypto_processTicks = 0;
-    }
-    if (ret == -1)
-    {
-        DBGLN("decrypt error");
-        return false;
-    }
-
-    otaPktPtr = (OTA_Packet_s * )plaintext;
-  }
-#else
     OTA_Packet_s * const otaPktPtr = (OTA_Packet_s * const)Radio.RXdataBuffer;
-#endif
 
     if (!OtaValidatePacketCrc(otaPktPtr))
     {
