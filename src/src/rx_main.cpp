@@ -944,14 +944,23 @@ static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPkt
             // DebugSerial.println();
 
             telemetryConfirmValue = OtaUnpackChannelData_RCDATA_AIO(&otaPkt, ChannelData, ExpressLRS_currTlmDenom);
-            DebugSerial.print("ChannelData: ");
-            for (uint8_t i = 0; i < 9; i++)
+            if (config.GetSecurity() == 1)
             {
-                DebugSerial.print(ChannelData[i]);
-                DebugSerial.print(" ");
+                DebugSerial.print("LEA-GCM ");
             }
-            DebugSerial.println();
+            if (config.GetSecurity() == 2)
+            {
+                DebugSerial.print("ASCON ");
+            }
         }
+
+        DebugSerial.print("RX ChannelData: ");
+        for (uint8_t i = 0; i < 9; i++)
+        {
+            DebugSerial.print(ChannelData[i]);
+            DebugSerial.print(" ");
+        }
+        DebugSerial.println();
 
         securityType = 0;
     }

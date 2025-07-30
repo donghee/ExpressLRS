@@ -552,11 +552,6 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
 
       const uint32_t now_ms = millis();
       dt = now_ms - msp_elapsedTime;
-#if defined(USE_CRYPTO)
-      DebugSerial.print("TX MSP hz: ");
-      DebugSerial.print(dt);
-      DebugSerial.println("us");
-#endif
       msp_elapsedTime = now_ms;
       if (otaPkt.full.msp_ul.payload[3] == 0x7C)
       {
@@ -596,14 +591,14 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
             return;
           }
           memcpy(otaPkt.full.rc_encrypted.raw, rcdata_ciphertext, rcdata_ciphertext_len);
-
-          DebugSerial.print("ChannelData: ");
-          for (uint8_t i = 0; i < 9; i++)
+          if (config.GetSecurity() == 1)
           {
-              DebugSerial.print(ChannelData[i]);
-              DebugSerial.print(" ");
+              DebugSerial.print("LEA-GCM ");
           }
-          DebugSerial.println();
+          if (config.GetSecurity() == 2)
+          {
+              DebugSerial.print("ASCON ");
+          }
 
           // DebugSerial.print("otaPkt rc encrypted raw: ");
           // for (uint8_t i = 0 ; i < 8; i++)
@@ -613,6 +608,7 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
           // }
           // DebugSerial.println();
         }
+        printChannelData_AIO(ChannelData);
       }
     }
   }

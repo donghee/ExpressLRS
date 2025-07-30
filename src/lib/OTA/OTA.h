@@ -180,6 +180,8 @@ extern GeneratePacketCrc_t OtaGeneratePacketCrc;
 #define ELRS_CRC14_POLY 0x2E57 // 0x372b
 #define ELRS_CRC16_POLY 0x3D65 // 0x9eb2
 
+void printChannelData_AIO(uint32_t *ChannelData);
+
 #if defined(TARGET_TX) || defined(UNIT_TEST)
 typedef void (*PackChannelData_t)(OTA_Packet_s * const otaPktPtr, const uint32_t *channelData, bool TelemetryStatus, uint8_t tlmDenom);
 extern PackChannelData_t OtaPackChannelData;
