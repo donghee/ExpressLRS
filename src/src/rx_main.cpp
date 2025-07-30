@@ -236,6 +236,8 @@ volatile unsigned long crypto_elapsedTime;
 volatile unsigned long crypto_processTime = 0;
 volatile uint32_t long crypto_processTicks = 0;
 volatile unsigned int crypto_samples = 0;
+
+ECDH rxEcdh;
 #if defined(USE_CRYPTO_KEY_EXCHANGE)
 RxHandshakeClass RxHandshake;
 #endif

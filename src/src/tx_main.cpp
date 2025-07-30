@@ -22,9 +22,7 @@
 #include "devBackpack.h"
 #include "gcm.h"
 #include "ascon128.h"
-#include "uECDH.h"
 #include "tx_handshake_ecdh.h"
-// #include "tx_handshake.h"
 
 //// CONSTANTS ////
 #define MSP_PACKET_SEND_INTERVAL 10LU
@@ -92,8 +90,6 @@ volatile unsigned long crypto_processTime = 0;
 volatile unsigned long crypto_processTicks = 0;
 volatile unsigned int crypto_samples = 0;
 
-ECDH txEcdh;
-ECDH rxEcdh;
 #if defined(USE_CRYPTO_KEY_EXCHANGE)
 TxHandshakeClass TxHandshake;
 #endif
@@ -1539,50 +1535,6 @@ void setup()
   }
 
 #if defined(USE_CRYPTO)
-  uint8_t tx_compressed_public_key[32];
-  size_t tx_compressed_public_key_len = 0;
-  uint8_t tx_secret_key[32];
-  size_t tx_secret_key_len = 0;
-  DebugSerial.print("TX ");
-  txEcdh.init();
-  txEcdh.compress_public_key(tx_compressed_public_key, &tx_compressed_public_key_len);
-  DebugSerial.print("Compressed TX public key: ");
-  for (size_t i = 0; i < 32; i++)
-  {
-    DebugSerial.printf("%02x", tx_compressed_public_key[i]);
-  }
-
-  uint8_t rx_compressed_public_key[32];
-  size_t rx_compressed_public_key_len = 0;
-  uint8_t rx_secret_key[32];
-  size_t rx_secret_key_len = 0;
-  DebugSerial.print("\r\nRX ");
-  rxEcdh.init();
-  rxEcdh.compress_public_key(rx_compressed_public_key, &rx_compressed_public_key_len);
-  DebugSerial.print("Compressed RX public key: ");
-  for (size_t i = 0; i < 32; i++)
-  {
-    DebugSerial.printf("%02x", rx_compressed_public_key[i]);
-  }
-
-  DebugSerial.print("\r\nGenerating secret keys");
-  txEcdh.generate_secret_key((const char *)rx_compressed_public_key, rx_compressed_public_key_len);
-  rxEcdh.generate_secret_key((const char *)tx_compressed_public_key, tx_compressed_public_key_len);
-
-  txEcdh.export_secret_key(tx_secret_key, &tx_secret_key_len);
-  rxEcdh.export_secret_key(rx_secret_key, &rx_secret_key_len);
-
-  DebugSerial.print("\r\nTX secret key: ");
-  for (size_t i = 0; i < 32; i++)
-  {
-    DebugSerial.printf("%02x", tx_secret_key[i]);
-  }
-  DebugSerial.print("\r\nRX secret key: ");
-  for (size_t i = 0; i < 32; i++)
-  {
-    DebugSerial.printf("%02x", rx_secret_key[i]);
-  }
-
   reconfigureCrypto();
 #endif
   // config.SetTlm(TLM_RATIO_1_2); // Force TLM ratio of 1:2 for balanced bi-dir link
