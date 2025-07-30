@@ -578,16 +578,17 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
         injectBackpackPanTiltRollData(now);
         OtaPackChannelData(&otaPkt, ChannelData, TelemetryReceiver.GetCurrentConfirm(), ExpressLRS_currTlmDenom);
 
-        uint8_t rcdata_plaintext[6] = {0};
-        uint8_t rcdata_ciphertext[10] = {0};
-        uint8_t rcdata_ciphertext_len = 0;
-
-        OtaPackChannelData_RCDATA_encrypted_AIO(rcdata_plaintext, ChannelData,
-                                                TelemetryReceiver.GetCurrentConfirm(),
-                                                ExpressLRS_currTlmDenom, otaPkt.full.rc_encrypted.isHighAux);
-        otaPkt.full.rc_encrypted.ch4 = CRSF_to_BIT(ChannelData[4]);
-        if (crypto)
+        if (crypto && config.GetSecurity() > 0)
         {
+          uint8_t rcdata_plaintext[6] = {0};
+          uint8_t rcdata_ciphertext[10] = {0};
+          uint8_t rcdata_ciphertext_len = 0;
+
+          OtaPackChannelData_RCDATA_AIO(rcdata_plaintext, ChannelData,
+                                        TelemetryReceiver.GetCurrentConfirm(),
+                                        ExpressLRS_currTlmDenom, otaPkt.full.rc_encrypted.isHighAux);
+          otaPkt.full.rc_encrypted.ch4 = CRSF_to_BIT(ChannelData[4]);
+
           rcdata_ciphertext_len = crypto->encrypt(rcdata_plaintext, sizeof(rcdata_plaintext), rcdata_ciphertext);
           if (rcdata_ciphertext_len == -1)
           {
@@ -595,15 +596,23 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
             return;
           }
           memcpy(otaPkt.full.rc_encrypted.raw, rcdata_ciphertext, rcdata_ciphertext_len);
-        }
 
-        DebugSerial.print("otaPkt rc encrypted raw: ");
-        for (uint8_t i = 0 ; i < 8; i++)
-        {
-          DebugSerial.print(otaPkt.full.rc_encrypted.raw[i], HEX);
-          DebugSerial.print(" ");
+          DebugSerial.print("ChannelData: ");
+          for (uint8_t i = 0; i < 9; i++)
+          {
+              DebugSerial.print(ChannelData[i]);
+              DebugSerial.print(" ");
+          }
+          DebugSerial.println();
+
+          // DebugSerial.print("otaPkt rc encrypted raw: ");
+          // for (uint8_t i = 0 ; i < 8; i++)
+          // {
+          //   DebugSerial.print(otaPkt.full.rc_encrypted.raw[i], HEX);
+          //   DebugSerial.print(" ");
+          // }
+          // DebugSerial.println();
         }
-        DebugSerial.println();
       }
     }
   }

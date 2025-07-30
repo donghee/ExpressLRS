@@ -294,7 +294,7 @@ void PackUInt11ToChannels4x2(const crsf_channels_t* src, uint8_t* destChannels4x
     }
 }
 
-void OtaPackChannelData_RCDATA_encrypted_AIO(uint8_t * rcdata, const uint32_t *channelData, bool telemetryStatus, uint8_t tlmDenom, uint8_t isHighAux)
+void OtaPackChannelData_RCDATA_AIO(uint8_t * rcdata, const uint32_t *channelData, bool telemetryStatus, uint8_t tlmDenom, uint8_t isHighAux)
 {
   OTA_Channels_4x10 tempChannels;
   // DebugSerial.print("ChannelData: ");
@@ -541,11 +541,10 @@ void UnpackChannels4x2ToUInt11(uint8_t const srcChannels4x2, uint32_t * dest, ui
   }
 }
 
-bool ICACHE_RAM_ATTR OtaUnpackChannelData_RCDATA_decrypted_AIO(OTA_Packet_s const * const otaPktPtr, uint32_t *channelData, uint8_t const tlmDenom)
+bool ICACHE_RAM_ATTR OtaUnpackChannelData_RCDATA_AIO(OTA_Packet_s const * const otaPktPtr, uint32_t *channelData, uint8_t const tlmDenom)
 {
     (void)tlmDenom;
 
-    OTA_Channels_4x10 tempChannels;
     OTA_Packet8_s const * const ota8 = (OTA_Packet8_s const * const)otaPktPtr;
 
 #if defined(DEBUG_RCVR_LINKSTATS)
@@ -574,9 +573,8 @@ bool ICACHE_RAM_ATTR OtaUnpackChannelData_RCDATA_decrypted_AIO(OTA_Packet_s cons
     }
     // Analog channels packed 10bit covering the entire CRSF extended range (i.e. not just 988-2012)
     // ** Different than the 10bit encoding in Hybrid/Wide mode **
-    memcpy(&tempChannels.raw[0], &ota8->rc_encrypted.raw[2], sizeof(OTA_Channels_4x10));
-    UnpackChannels4x10ToUInt11(&tempChannels, &channelData[chDstLow]);
-    UnpackChannels4x2ToUInt11(ota8->rc_encrypted.raw[7], &channelData[chDstHigh], ota8->rc.isHighAux);
+    UnpackChannels4x10ToUInt11(&ota8->rc.chLow, &channelData[chDstLow]);
+    UnpackChannels4x2ToUInt11(ota8->rc_encrypted.raw[5], &channelData[chDstHigh], ota8->rc.isHighAux);
 #endif
     // Restore the uplink_TX_Power range 0-7 -> 1-8
     CRSF::updateUplinkPower(ota8->rc.uplinkPower + 1);

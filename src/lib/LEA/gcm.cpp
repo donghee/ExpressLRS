@@ -90,7 +90,7 @@ int GCM::init()
     // if (GCM4LEA_set_init_params(&gcm_TX, K, 128, A, 16, 32))
     // Tbits = 16 for nonce sync, so gcm_TX.T is 2 bytes
     start[0] = ARM_CM_DWT_CYCCNT;
-    result = GCM4LEA_set_init_params(&gcm_TX, K, 128, A, 16, 16);
+    result = GCM4LEA_set_init_params(&gcm_TX, K, 128, A, 16, 16); // Last argument is Tbits = 16
     stop[0] = ARM_CM_DWT_CYCCNT;
 
     if (result < 0) {
@@ -117,20 +117,17 @@ int GCM::decrypt(const uint8_t *ciphertext, uint8_t ciphertext_len, uint8_t *pla
 	COUNTER_RX_new = (ciphertext[0] << 8) | ciphertext[1]; // 2 bytes
 	COUNTER_RX_gap = (COUNTER_RX_new - COUNTER_RX + 65536) % 65536;
 
-  	// [Note] 만일 COUNTER_RX_gap = 0이면 초기화 직후 송수신으로 판별할 수 있음 (0이 반복되는 경우에도 정상적인 상황이 아니기 때문에 이에 대한 처리도 필요함!!!!!!!!!)
-	// [Note] 만인 COUNTER_RX_gap = 1이면 초기화 단계 후에 전상적으로 1씩 증가된 송수신으로 판별할 수 있음
-	// [Note] 만일 COUNTER_Rx_gap이 큰 값이면 신호가 끊긴 시간이 길거나 정상적이지 않은 상황으로 판별하고 초기화를 재시도
-	if (COUNTER_RX_gap < 200) // 200은 적당히 작은 값으로 변경 (실험 후)
+    if((COUNTER_RX_gap < 3000 && initStatus == 0) || (COUNTER_RX_gap < 500 && initStatus != 0))
 	{
-		for(int i = 0; i < COUNTER_RX_gap; i++)
-		{
-	    	increment_nonce_counter(N);
-		}
+		// for(int i = 0; i < COUNTER_RX_gap; i++)
+		// {
+		//     increment_nonce_counter(N);
+		// }
+        increase_nonce_counter_up_to_32bits_increment(N, COUNTER_RX_gap);
 
 		COUNTER_RX = COUNTER_RX_new;
 
-        // if (COUNTER_RX_new > 500) // 50hz * 10s = 500
-        //     __BKPT();
+        initStatus = 1;
 	}
 	else
 	{

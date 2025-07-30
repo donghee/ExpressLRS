@@ -922,36 +922,36 @@ static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPkt
         uint8_t rcdata_plaintext_len = 0;
         uint8_t rcdata_plaintext[6] = {0};
         OTA_Packet_s otaPkt = {0};
-        memcpy(&otaPkt, otaPktPtr, sizeof(OTA_Packet_s));
-        memcpy(rcdata_ciphertext, otaPktPtr->full.rc_encrypted.raw, sizeof(otaPktPtr->full.rc_encrypted.raw));
-        if (crypto)
+
+        if (crypto && config.GetSecurity() > 0)
         {
-          rcdata_plaintext_len = crypto->decrypt(rcdata_ciphertext, sizeof(rcdata_ciphertext), rcdata_plaintext);
-          if (rcdata_plaintext_len == -1)
-          {
-            DBGLN("RC data decryption failed");
-            return;
-          }
+            memcpy(&otaPkt, otaPktPtr, sizeof(OTA_Packet_s));
+            memcpy(rcdata_ciphertext, otaPktPtr->full.rc_encrypted.raw, sizeof(otaPktPtr->full.rc_encrypted.raw));
+            rcdata_plaintext_len = crypto->decrypt(rcdata_ciphertext, sizeof(rcdata_ciphertext), rcdata_plaintext);
+            if (rcdata_plaintext_len == -1)
+            {
+                DBGLN("RC data decryption failed");
+            }
 
-          memcpy(&otaPkt.full.rc_encrypted.raw[2], rcdata_plaintext, rcdata_plaintext_len);
+            memcpy(&otaPkt.full.rc_encrypted.raw[0], rcdata_plaintext, rcdata_plaintext_len);
+
+            // DebugSerial.print("otaPkt rc encrypted raw: ");
+            // for (uint8_t i = 0 ; i < 8; i++)
+            // {
+            //   DebugSerial.print(otaPktPtr->full.rc_encrypted.raw[i], HEX);
+            //   DebugSerial.print(" ");
+            // }
+            // DebugSerial.println();
+
+            telemetryConfirmValue = OtaUnpackChannelData_RCDATA_AIO(&otaPkt, ChannelData, ExpressLRS_currTlmDenom);
+            DebugSerial.print("ChannelData: ");
+            for (uint8_t i = 0; i < 9; i++)
+            {
+                DebugSerial.print(ChannelData[i]);
+                DebugSerial.print(" ");
+            }
+            DebugSerial.println();
         }
-
-        // DebugSerial.print("otaPkt rc encrypted raw: ");
-        // for (uint8_t i = 0 ; i < 8; i++)
-        // {
-        //   DebugSerial.print(otaPktPtr->full.rc_encrypted.raw[i], HEX);
-        //   DebugSerial.print(" ");
-        // }
-        // DebugSerial.println();
-        DebugSerial.print("ChannelData: ");
-
-        telemetryConfirmValue = OtaUnpackChannelData_RCDATA_decrypted_AIO(&otaPkt, ChannelData, ExpressLRS_currTlmDenom);
-        for (uint8_t i = 0; i < 9; i++)
-        {
-            DebugSerial.print(ChannelData[i]);
-            DebugSerial.print(" ");
-        }
-        DebugSerial.println();
 
         securityType = 0;
     }
