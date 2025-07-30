@@ -916,6 +916,24 @@ static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPkt
     else
     {
         telemetryConfirmValue = OtaUnpackChannelData(otaPktPtr, ChannelData, ExpressLRS_currTlmDenom);
+        // DebugSerial.print("otaPkt rc encrypted raw: ");
+        // for (uint8_t i = 0 ; i < 8; i++)
+        // {
+        //   DebugSerial.print(otaPktPtr->full.rc_encrypted.raw[i], HEX);
+        //   DebugSerial.print(" ");
+        // }
+        // DebugSerial.println();
+        // DebugSerial.print("ChannelData CH5-CH12: ");
+        // DebugSerial.println(otaPktPtr->full.rc_encrypted.raw[7], BIN);
+        DebugSerial.print("ChannelData: ");
+        telemetryConfirmValue = OtaUnpackChannelData_RCDATA_decrypted_AIO(otaPktPtr, ChannelData, ExpressLRS_currTlmDenom);
+        for (uint8_t i = 0; i < 9; i++)
+        {
+            DebugSerial.print(ChannelData[i]);
+            DebugSerial.print(" ");
+        }
+        DebugSerial.println();
+
         securityType = 0;
     }
 

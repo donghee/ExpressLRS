@@ -23,6 +23,8 @@ static Crc2Byte ota_crc;
 ValidatePacketCrc_t OtaValidatePacketCrc;
 GeneratePacketCrc_t OtaGeneratePacketCrc;
 
+extern HardwareSerial DebugSerial;
+
 void OtaUpdateCrcInitFromUid()
 {
     OtaCrcInitializer = (UID[4] << 8) | UID[5];
@@ -276,6 +278,80 @@ static void ICACHE_RAM_ATTR GenerateChannelData8ch(OTA_Packet_s * const otaPktPt
     GenerateChannelData8ch12ch((OTA_Packet8_s * const)otaPktPtr, channelData, TelemetryStatus, false);
 }
 
+void PackUInt11ToChannels4x2(const crsf_channels_t* src, uint8_t* destChannels4x2, uint8_t isHighAux) {
+    // Pack the high channels (either CH5-CH8 or CH9-CH12 depending on isHighAux)
+    if (isHighAux) {
+        // Pack the high channel(11-bits) into a 2-bits value
+        *destChannels4x2 = (CRSF_to_N(src->ch9, 4) << 0) |
+                  (CRSF_to_N(src->ch10, 4) << 2) |
+                  (CRSF_to_N(src->ch11, 4) << 4) |
+                  (CRSF_to_N(src->ch12, 4) << 6);
+    } else {
+        *destChannels4x2 = (CRSF_to_N(src->ch5, 4) << 0) |
+                  (CRSF_to_N(src->ch6, 4) << 2) |
+                  (CRSF_to_N(src->ch7, 4) << 4) |
+                  (CRSF_to_N(src->ch8, 4) << 6);
+    }
+}
+
+void OtaPackChannelData_RCDATA_encrypted_AIO(OTA_Packet_s * const otaPkt, const uint32_t *channelData, bool telemetryStatus, uint8_t tlmDenom)
+{
+  static uint16_t counter = 0;
+  OTA_Channels_4x10 tempChannels;
+  DebugSerial.print("ChannelData: ");
+  for (int i = 0; i < 9; i++) {
+      DebugSerial.print(channelData[i]);
+      DebugSerial.print(" ");
+  }
+  DebugSerial.println();
+  PackUInt11ToChannels4x10(&channelData[0], &tempChannels, &Decimate11to10_Div2);
+
+  // DebugSerial.print("OTAPack channels: ");
+  // for (int i = 0; i < sizeof(OTA_Channels_4x10); i++) {
+  //     DebugSerial.print(tempChannels.raw[i]);
+  //     DebugSerial.print(" ");
+  // }
+  // DebugSerial.println();
+
+  uint8_t channelData_ch5_ch12;
+  crsf_channels_t crsf_channelData_ch5_ch12;
+  crsf_channelData_ch5_ch12.ch5 = channelData[5];
+  crsf_channelData_ch5_ch12.ch6 = channelData[6];
+  crsf_channelData_ch5_ch12.ch7 = channelData[7];
+  crsf_channelData_ch5_ch12.ch8 = channelData[8];
+  crsf_channelData_ch5_ch12.ch9 = channelData[9];
+  crsf_channelData_ch5_ch12.ch10 = channelData[10];
+  crsf_channelData_ch5_ch12.ch11 = channelData[11];
+  crsf_channelData_ch5_ch12.ch12 = channelData[12];
+
+  PackUInt11ToChannels4x2(&crsf_channelData_ch5_ch12, &channelData_ch5_ch12, otaPkt->full.rc_encrypted.isHighAux);
+
+  uint8_t rc_encrypted_raw[8] = {0};
+  counter++;
+  rc_encrypted_raw[0] = (counter >> 8) & 0xFF; // High byte of the counter
+  rc_encrypted_raw[1] = (counter & 0xFF); // Low byte of the counter
+  memcpy(&rc_encrypted_raw[2], &tempChannels.raw[0], sizeof(OTA_Channels_4x10));
+  rc_encrypted_raw[7] = channelData_ch5_ch12; // Pack the high channels (CH5-CH12) into the last byte
+  memcpy(&otaPkt->full.rc_encrypted.raw, rc_encrypted_raw, sizeof(rc_encrypted_raw));
+
+  otaPkt->full.rc_encrypted.ch4 = CRSF_to_BIT(ChannelData[4]);
+
+  // otaPkt->full.rc_encrypted.packetType = PACKET_TYPE_RCDATA;
+  //otaPkt->full.rc_encrypted.securityType = securityType;
+  //otaPkt->full.rc_encrypted.free = 0;
+  // otaPkt->full.rc_encrypted.telemetryStatus = telemetryStatus;
+  // otaPkt->full.rc_encrypted.uplinkPower = constrain(CRSF::LinkStatistics.uplink_TX_Power, 1, 8) - 1;
+  //otaPkt->full.rc_encrypted.isHighAux = 0;
+  // otaPkt->full.rc_encrypted.ch4 = CRSF_to_BIT(channelData[4]);
+
+  // 4 bits Packet Counter for Encrypted Channel Data to prevent replay attacks
+  // COUNTER_4b = (COUNTER_4b + 1) % 16;
+  // ChannelDataEncrypted[1] = (COUNTER_4b << 4) | (ChannelDataEncrypted[1] & 0x0F);
+
+  // If the channel data is encrypted, copy the channel data to the encrypted buffer
+  // memcpy(&otaPkt.full.rc_encrypted.raw, ChannelDataEncrypted+1, 10);
+}
+
 static bool FullResIsHighAux;
 #if defined(UNIT_TEST)
 void OtaSetFullResNextChannelSet(bool next) { FullResIsHighAux = next; }
@@ -475,6 +551,62 @@ bool ICACHE_RAM_ATTR UnpackChannelData8ch(OTA_Packet_s const * const otaPktPtr, 
     // ** Different than the 10bit encoding in Hybrid/Wide mode **
     UnpackChannels4x10ToUInt11(&ota8->rc.chLow, &channelData[chDstLow]);
     UnpackChannels4x10ToUInt11(&ota8->rc.chHigh, &channelData[chDstHigh]);
+#endif
+    // Restore the uplink_TX_Power range 0-7 -> 1-8
+    CRSF::updateUplinkPower(ota8->rc.uplinkPower + 1);
+    return ota8->rc.telemetryStatus;
+}
+
+void UnpackChannels4x2ToUInt11(uint8_t const srcChannels4x2, uint32_t * dest, uint8_t isHighAux) {
+  if (isHighAux) {
+    dest[4] = N_to_CRSF((srcChannels4x2 >> 0) & 0x03, 3);
+    dest[5] = N_to_CRSF((srcChannels4x2 >> 2) & 0x03, 3);
+    dest[6] = N_to_CRSF((srcChannels4x2 >> 4) & 0x03, 3);
+    dest[7] = N_to_CRSF((srcChannels4x2 >> 6) & 0x03, 3);
+  } else {
+    dest[0] = N_to_CRSF((srcChannels4x2 >> 0) & 0x03, 3);
+    dest[1] = N_to_CRSF((srcChannels4x2 >> 2) & 0x03, 3);
+    dest[2] = N_to_CRSF((srcChannels4x2 >> 4) & 0x03, 3);
+    dest[3] = N_to_CRSF((srcChannels4x2 >> 6) & 0x03, 3);
+  }
+}
+
+bool ICACHE_RAM_ATTR OtaUnpackChannelData_RCDATA_decrypted_AIO(OTA_Packet_s const * const otaPktPtr, uint32_t *channelData, uint8_t const tlmDenom)
+{
+    (void)tlmDenom;
+
+    OTA_Channels_4x10 tempChannels;
+    OTA_Packet8_s const * const ota8 = (OTA_Packet8_s const * const)otaPktPtr;
+
+#if defined(DEBUG_RCVR_LINKSTATS)
+    debugRcvrLinkstatsPacketId = ota8->dbg_linkstats.packetNum;
+#else
+    uint8_t chDstLow;
+    uint8_t chDstHigh;
+    if (OtaSwitchModeCurrent == smHybridOr16ch)
+    {
+        if (ota8->rc.isHighAux)
+        {
+            chDstLow = 8;
+            chDstHigh = 12;
+        }
+        else
+        {
+            chDstLow = 0;
+            chDstHigh = 4;
+        }
+    }
+    else
+    {
+        channelData[4] = BIT_to_CRSF(ota8->rc.ch4);
+        chDstLow = 0;
+        chDstHigh = (ota8->rc.isHighAux) ? 9 : 5;
+    }
+    // Analog channels packed 10bit covering the entire CRSF extended range (i.e. not just 988-2012)
+    // ** Different than the 10bit encoding in Hybrid/Wide mode **
+    memcpy(&tempChannels.raw[0], &ota8->rc_encrypted.raw[2], sizeof(OTA_Channels_4x10));
+    UnpackChannels4x10ToUInt11(&tempChannels, &channelData[chDstLow]);
+    UnpackChannels4x2ToUInt11(ota8->rc_encrypted.raw[7], &channelData[chDstHigh], ota8->rc.isHighAux);
 #endif
     // Restore the uplink_TX_Power range 0-7 -> 1-8
     CRSF::updateUplinkPower(ota8->rc.uplinkPower + 1);
