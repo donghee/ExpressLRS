@@ -591,6 +591,15 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
             return;
           }
           memcpy(otaPkt.full.rc_encrypted.raw, rcdata_ciphertext, rcdata_ciphertext_len);
+
+          DebugSerial.print("Encrypted ChannelData: ");
+          for (uint8_t i = 0 ; i < 10; i++)
+          {
+            DebugSerial.print(otaPkt.full.rc_encrypted.raw[i], HEX);
+            DebugSerial.print(" ");
+          }
+          DebugSerial.println();
+
           if (config.GetSecurity() == 1)
           {
               DebugSerial.print("LEA-GCM ");
@@ -599,14 +608,6 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
           {
               DebugSerial.print("ASCON ");
           }
-
-          // DebugSerial.print("otaPkt rc encrypted raw: ");
-          // for (uint8_t i = 0 ; i < 8; i++)
-          // {
-          //   DebugSerial.print(otaPkt.full.rc_encrypted.raw[i], HEX);
-          //   DebugSerial.print(" ");
-          // }
-          // DebugSerial.println();
         }
         printChannelData_AIO(ChannelData);
       }
@@ -1394,6 +1395,7 @@ void setup()
   while (!TxHandshake.IsDone()) {
     TxHandshake.DoHandle();
   }
+  delay(1000);
 #endif
 
   if (setupHardwareFromOptions())

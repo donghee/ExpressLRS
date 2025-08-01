@@ -115,19 +115,41 @@ int GCM::decrypt(const uint8_t *ciphertext, uint8_t ciphertext_len, uint8_t *pla
 
     // counter up
 	COUNTER_RX_new = (ciphertext[0] << 8) | ciphertext[1]; // 2 bytes
-	COUNTER_RX_gap = (COUNTER_RX_new - COUNTER_RX + 65536) % 65536;
+	// COUNTER_RX_gap = (COUNTER_RX_new - COUNTER_RX + 65536) % 65536;
+	COUNTER_RX_gap = (COUNTER_RX_new - COUNTER_RX) % 65536;
 
-    if((COUNTER_RX_gap < 3000 && initStatus == 0) || (COUNTER_RX_gap < 500 && initStatus != 0))
-	{
-		// for(int i = 0; i < COUNTER_RX_gap; i++)
-		// {
-		//     increment_nonce_counter(N);
-		// }
+    if (COUNTER_RX_gap < 500 && initStatus == 1) {
+        // for(int i = 0; i < COUNTER_RX_gap - 1; i++)
+        // {
+        //     increment_nonce_counter(N);
+        //     DebugSerial.print("\r\nIN COUNTER Nonce: ");
+        //     for (int j = 0; j < 16; j++) {
+        //         DebugSerial.print(N[j], HEX);
+        //         DebugSerial.print(" ");
+        //     }
+        //     DebugSerial.println(" ");
+        //
+        // }
         increase_nonce_counter_up_to_32bits_increment(N, COUNTER_RX_gap);
-
+        // DebugSerial.printf("fist GCM::decrypt: COUNTER_RX_gap = %d, incremented nonce to ", COUNTER_RX_gap);
 		COUNTER_RX = COUNTER_RX_new;
-
-        initStatus = 1;
+        initStatus = 0;
+    } else if (COUNTER_RX_gap < 3000 && initStatus == 0)
+	{
+        // for(int i = 0; i < COUNTER_RX_gap; i++)
+        // {
+        //     increment_nonce_counter(N);
+        //     DebugSerial.print("\r\nIN COUNTER Nonce: ");
+        //     for (int j = 0; j < 16; j++) {
+        //         DebugSerial.print(N[j], HEX);
+        //         DebugSerial.print(" ");
+        //     }
+        //     DebugSerial.println(" ");
+        //
+        // }
+        increase_nonce_counter_up_to_32bits_increment(N, COUNTER_RX_gap);
+        // DebugSerial.printf("other GCM::decrypt: COUNTER_RX_gap = %d, incremented nonce to ", COUNTER_RX_gap);
+		COUNTER_RX = COUNTER_RX_new;
 	}
 	else
 	{
@@ -135,8 +157,15 @@ int GCM::decrypt(const uint8_t *ciphertext, uint8_t ciphertext_len, uint8_t *pla
 		// 초기화, 비정상적인 상황에 대한 예외처리
 	}
 
+    // DebugSerial.print("\r\nNonce: ");
+    // for (int j = 0; j < 16; j++) {
+    //     DebugSerial.print(N[j], HEX);
+    //     DebugSerial.print(" ");
+    // }
+    // DebugSerial.println(" ");
+
     // Tbits = 16 for nonce sync, so ciphertext + 2 is pointer of gcm_RX.T
-   	result =  GCM4LEA_set_dec_params(&gcm_RX, ciphertext + 4, plaintext_len, N, 12, ciphertext + 2);
+   	result =  GCM4LEA_set_dec_params(&gcm_RX, ciphertext + 4, plaintext_len, N+4, 12, ciphertext + 2);
     if (result < 0) {
         return -1;
     }
@@ -157,7 +186,7 @@ int GCM::encrypt(const uint8_t *plaintext, int plaintext_len, uint8_t *ciphertex
 {
     int result;
 
-    result = GCM4LEA_set_enc_params(&gcm_TX, (uint8_t *)plaintext, plaintext_len, N, 12);
+    result = GCM4LEA_set_enc_params(&gcm_TX, (uint8_t *)plaintext, plaintext_len, N+4, 12);
     if (result < 0) {
         return -1;
     }
@@ -169,14 +198,22 @@ int GCM::encrypt(const uint8_t *plaintext, int plaintext_len, uint8_t *ciphertex
         return -1;
     }
 
-    // counter up
-    COUNTER_TX = (COUNTER_TX + 1) % 65536;
-    increment_nonce_counter(N);
-
     ciphertext[0] = (uint8_t)(COUNTER_TX >> 8); // 2 bytes
     ciphertext[1] = (uint8_t)COUNTER_TX;
     memcpy((uint8_t *)ciphertext + 2, gcm_TX.T, 2);
     memcpy((uint8_t *)ciphertext + 4, gcm_TX.CC, plaintext_len);
+
+    // counter up
+    COUNTER_TX = (COUNTER_TX + 1) % 65536;
+    increment_nonce_counter(N);
+
+    DebugSerial.print("\r\nNonce: ");
+    for (int j = 0; j < 16; j++) {
+        DebugSerial.print(N[j], HEX);
+        DebugSerial.print(" ");
+    }
+    DebugSerial.println(" ");
+
 
     return 2 + 2 + gcm_TX.CC_byte_length; // 2 bytes for counter + 2 bytes for T + ciphertext
 }
