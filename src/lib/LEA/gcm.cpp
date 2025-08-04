@@ -39,39 +39,13 @@ void GCM::increase_nonce_counter_up_to_32bits_increment(uint8_t *nonce, uint32_t
     }
 }
 
-uint32_t GCM::encryption_time()
-{
-    delta[1] = stop[1] - start[1];
-    return delta[1];
-}
-
-uint32_t GCM::decryption_time()
-{
-    delta[2] = stop[2] - start[2];
-    return delta[2];
-}
-
-// int GCM::init(uint8_t *K_, size_t K_len_, uint8_t *A_, size_t A_len_, uint8_t *N_, size_t N_len_)
 int GCM::init(const uint8_t* K_, uint32_t K_len_, const uint8_t* A_, uint32_t A_len_, uint8_t *N_, size_t N_len_)
 {
     int result;
 
-    // Measurement of lea encryption and decryption time
-    if (ARM_CM_DWT_CTRL != 0) 			// See if DWT is available
-    {
-		ARM_CM_DEMCR      |= 1 << 24;	// Set bit 24
-		ARM_CM_DWT_CYCCNT  = 0;
-		ARM_CM_DWT_CTRL   |= 1 << 0;	// Set bit 0
-    }
-
     memcpy(K, K_, K_len_);
     memcpy(A, A_, A_len_);
     memcpy(N, N_, N_len_);
-
-    // 1. 바이딩 초기화 단계 키 교환 과정에서 Nonce 초기값도 암호화된 방식으로 함께 공유 (연결이 끊겨 리셋 될 때마다 수행되어야 함)
-	COUNTER_TX = 0; // 초기화
-	COUNTER_RX = 0; // 초기화 (COUNTER_TX와 동일한 값으로)
-	initStatus = 1;
 
     result = init();
     if (result < 0) {
@@ -85,22 +59,20 @@ int GCM::init()
 {
     int result;
 
-    // Kbits= 128, Abytes=16, Tbits = 32
-    // TODO: To reduce the packet size, the bit size of T must be reduced. 8 * 16 = 128
-    // if (GCM4LEA_set_init_params(&gcm_TX, K, 128, A, 16, 32))
-    // Tbits = 16 for nonce sync, so gcm_TX.T is 2 bytes
-    start[0] = ARM_CM_DWT_CYCCNT;
-    result = GCM4LEA_set_init_params(&gcm_TX, K, 128, A, 16, 16); // Last argument is Tbits = 16
-    stop[0] = ARM_CM_DWT_CYCCNT;
+    // 카운터 초기화, initStatus 초기화
+	COUNTER_TX = 0;
+	COUNTER_RX = 0;
+	initStatus = 0;
+
+    // Kbits= 128, Abytes=16, Tbits = 16
+    result = GCM4LEA_set_init_params(&gcm_TX, K, 128, A, 16, 16); // Last argument Tbits is 16
 
     if (result < 0) {
         return -1;
     }
 
-    // TODO: delete other gcm_TX
-    // if (GCM4LEA_set_init_params(&gcm_RX, K, 128, A, 16, 32))
     // Tbits = 16 for nonce sync, so gcm_RX.T is 2 bytes
-    result = GCM4LEA_set_init_params(&gcm_RX, K, 128, A, 16, 16);
+    result = GCM4LEA_set_init_params(&gcm_RX, K, 128, A, 16, 16); // Last argument Tbits is 16
     if (result < 0) {
         return -1;
     }
@@ -115,49 +87,18 @@ int GCM::decrypt(const uint8_t *ciphertext, uint8_t ciphertext_len, uint8_t *pla
 
     // counter up
 	COUNTER_RX_new = (ciphertext[0] << 8) | ciphertext[1]; // 2 bytes
-	// COUNTER_RX_gap = (COUNTER_RX_new - COUNTER_RX + 65536) % 65536;
-	COUNTER_RX_gap = (COUNTER_RX_new - COUNTER_RX) % 65536;
+	COUNTER_RX_gap = (COUNTER_RX_new - COUNTER_RX + 65536) % 65536;
 
-    if (COUNTER_RX_gap < 500 && initStatus == 1) {
-        // for(int i = 0; i < COUNTER_RX_gap - 1; i++)
-        // {
-        //     increment_nonce_counter(N);
-        //     DebugSerial.print("\r\nIN COUNTER Nonce: ");
-        //     for (int j = 0; j < 16; j++) {
-        //         DebugSerial.print(N[j], HEX);
-        //         DebugSerial.print(" ");
-        //     }
-        //     DebugSerial.println(" ");
-        //
-        // }
+    if((COUNTER_RX_gap < 3000 && initStatus == 0) || (COUNTER_RX_gap < 500 && initStatus != 0)) {
         increase_nonce_counter_up_to_32bits_increment(N, COUNTER_RX_gap);
-        // DebugSerial.printf("fist GCM::decrypt: COUNTER_RX_gap = %d, incremented nonce to ", COUNTER_RX_gap);
 		COUNTER_RX = COUNTER_RX_new;
-        initStatus = 0;
-    } else if (COUNTER_RX_gap < 3000 && initStatus == 0)
-	{
-        // for(int i = 0; i < COUNTER_RX_gap; i++)
-        // {
-        //     increment_nonce_counter(N);
-        //     DebugSerial.print("\r\nIN COUNTER Nonce: ");
-        //     for (int j = 0; j < 16; j++) {
-        //         DebugSerial.print(N[j], HEX);
-        //         DebugSerial.print(" ");
-        //     }
-        //     DebugSerial.println(" ");
-        //
-        // }
-        increase_nonce_counter_up_to_32bits_increment(N, COUNTER_RX_gap);
-        // DebugSerial.printf("other GCM::decrypt: COUNTER_RX_gap = %d, incremented nonce to ", COUNTER_RX_gap);
-		COUNTER_RX = COUNTER_RX_new;
+        initStatus = 1;
 	}
-	else
-	{
-        // TODO
+	else {
 		// 초기화, 비정상적인 상황에 대한 예외처리
 	}
 
-    // DebugSerial.print("\r\nNonce: ");
+    // DebugSerial.print("Nonce: ");
     // for (int j = 0; j < 16; j++) {
     //     DebugSerial.print(N[j], HEX);
     //     DebugSerial.print(" ");
@@ -165,14 +106,12 @@ int GCM::decrypt(const uint8_t *ciphertext, uint8_t ciphertext_len, uint8_t *pla
     // DebugSerial.println(" ");
 
     // Tbits = 16 for nonce sync, so ciphertext + 2 is pointer of gcm_RX.T
-   	result =  GCM4LEA_set_dec_params(&gcm_RX, ciphertext + 4, plaintext_len, N+4, 12, ciphertext + 2);
+   	result =  GCM4LEA_set_dec_params(&gcm_RX, ciphertext + 4, plaintext_len, N_GCM, 12, ciphertext + 2);
     if (result < 0) {
         return -1;
     }
 
-    start[2] = ARM_CM_DWT_CYCCNT;
     result = GCM4LEA_dec(&gcm_RX);
-    stop[2] = ARM_CM_DWT_CYCCNT;
     if (result < 0) {
         return -1;
     }
@@ -186,14 +125,12 @@ int GCM::encrypt(const uint8_t *plaintext, int plaintext_len, uint8_t *ciphertex
 {
     int result;
 
-    result = GCM4LEA_set_enc_params(&gcm_TX, (uint8_t *)plaintext, plaintext_len, N+4, 12);
+    result = GCM4LEA_set_enc_params(&gcm_TX, (uint8_t *)plaintext, plaintext_len, N_GCM, 12);
     if (result < 0) {
         return -1;
     }
 
-    start[1] = ARM_CM_DWT_CYCCNT;
     result =  GCM4LEA_enc(&gcm_TX);
-    stop[1] = ARM_CM_DWT_CYCCNT;
     if (result < 0) {
         return -1;
     }
@@ -203,17 +140,16 @@ int GCM::encrypt(const uint8_t *plaintext, int plaintext_len, uint8_t *ciphertex
     memcpy((uint8_t *)ciphertext + 2, gcm_TX.T, 2);
     memcpy((uint8_t *)ciphertext + 4, gcm_TX.CC, plaintext_len);
 
-    // counter up
+    // counter up and nonce advance
     COUNTER_TX = (COUNTER_TX + 1) % 65536;
     increment_nonce_counter(N);
 
-    DebugSerial.print("\r\nNonce: ");
-    for (int j = 0; j < 16; j++) {
-        DebugSerial.print(N[j], HEX);
-        DebugSerial.print(" ");
-    }
-    DebugSerial.println(" ");
-
+    // DebugSerial.print("Nonce: ");
+    // for (int j = 0; j < 16; j++) {
+    //     DebugSerial.print(N[j], HEX);
+    //     DebugSerial.print(" ");
+    // }
+    // DebugSerial.println(" ");
 
     return 2 + 2 + gcm_TX.CC_byte_length; // 2 bytes for counter + 2 bytes for T + ciphertext
 }

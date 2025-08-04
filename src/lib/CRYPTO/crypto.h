@@ -28,7 +28,7 @@ public:
      * @param A_ Associated data buffer
      * @param A_len_ Associated data length
      * @param N_ Nonce buffer
-     * @param N_len_ Nonce length
+     * @param N_len_ Nonce length, LEA use Bits, Ascon use Bytes
      * @return 0 on success, negative value on error
 j    */
     virtual int init(const uint8_t* K_, uint32_t K_len_,
@@ -89,17 +89,5 @@ j    */
      * @return Current counter value
      */
     virtual int counter() = 0;
-
-    /**
-     * @brief Get encryption time measurement
-     * @return Encryption time in cycles or microseconds
-     */
-    virtual uint32_t encryption_time() = 0;
-
-    /**
-     * @brief Get decryption time measurement
-     * @return Decryption time in cycles or microseconds
-     */
-    virtual uint32_t decryption_time() = 0;
 };
 

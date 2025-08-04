@@ -4,28 +4,21 @@
 
 #include <Arduino.h>
 
-// void __attribute__ ((noinline)) breakpoint()
-// {
-//     __asm("NOP");
-// }
-//
 extern HardwareSerial DebugSerial;
 
 #define MAX_P_C_BYTE_LENGTH 256
 
 Ascon128::Ascon128() {
-  ASCON128x_reset(&ascon_TX);
-  ASCON128x_reset(&ascon_RX);
+    ASCON128x_reset(&ascon_TX);
+    ASCON128x_reset(&ascon_RX);
 }
 
 Ascon128::~Ascon128() {
-  // Clear sensitive data
-  // memset(&ascon, 0, sizeof(ASCON_st));
 }
 
 void Ascon128::increment_nonce_counter(uint8_t *nonce)
 {
-	int i;
+    int i;
     for (i = 15; i >= 0; --i)
     {
         if (++nonce[i] != 0)
@@ -35,18 +28,17 @@ void Ascon128::increment_nonce_counter(uint8_t *nonce)
     }
 }
 
-// by Joungil Yun (2025.02.05.)
 void Ascon128::increase_nonce_counter_up_to_32bits_increment(uint8_t *nonce, uint32_t increment)
 {
-	int i;
-	uint32_t carry = increment;
-	uint32_t temp;
+    int i;
+    uint32_t carry = increment;
+    uint32_t temp;
 
     for (i = 15; i >= 0; --i)
     {
-    	temp = nonce[i] + carry;
-    	nonce[i] = (uint8_t)temp;
-    	carry = temp >> 8;
+        temp = nonce[i] + carry;
+        nonce[i] = (uint8_t)temp;
+        carry = temp >> 8;
         if (carry == 0)
         {
             break;
@@ -54,63 +46,51 @@ void Ascon128::increase_nonce_counter_up_to_32bits_increment(uint8_t *nonce, uin
     }
 }
 
-uint32_t Ascon128::encryption_time()
-{
-    delta[1] = stop[1] - start[1];
-    return delta[1];
-}
-
-uint32_t Ascon128::decryption_time()
-{
-    delta[2] = stop[2] - start[2];
-    return delta[2];
-}
-
 int Ascon128::init(const uint8_t* K_, uint32_t K_len_,
                    const uint8_t* A_, uint32_t A_len_,
                    uint8_t *N_, size_t N_len_) {
-  int result;
+    int result;
 
-  COUNTER_TX = 0; // 초기화
-  COUNTER_RX = 0; // 초기화 (COUNTER_TX와 동일한 값으로)
+    memcpy(K, K_, K_len_);
+    memcpy(A, A_, A_len_);
+    memcpy(N, N_, N_len_);
 
-  memcpy(K, K_, K_len_);
-  memcpy(A, A_, A_len_);
+    result = init();
+    if (result < 0) {
+        return -1;
+    }
 
-  result = init();
-  if (result < 0) {
-    return -1;
-  }
-
-  return 0;
+    return 0;
 }
 
 int Ascon128::init() {
-  int result;
+    int result;
 
-  // K 16 bytes = 128 bits, A 16 bytes, T 2 bytes
-  start[0] = ARM_CM_DWT_CYCCNT;
-  result = ASCON128x_set_init_params(&ascon_TX, K, 128, A, 16, 2); // TBytes 2 bytes
-  stop[0] = ARM_CM_DWT_CYCCNT;
+    // 카운터 초기화, initStatus 초기화
+    COUNTER_TX = 0;
+    COUNTER_RX = 0;
+    initStatus = 0;
 
-  if (result < 0) {
-    return -1;
-  }
+    // K 16 bytes = 128 bits, A 16 bytes, T 2 bytes
+    result = ASCON128x_set_init_params(&ascon_TX, K, 128, A, 16, 2); // Last argument TBytes is 2 bytes
 
-  result = ASCON128x_set_init_params(&ascon_RX, K, 128, A, 16, 2); // Last argument is TBytes 2 bytes
-  if (result < 0) {
-    return -1;
-  }
+    if (result < 0) {
+        return -1;
+    }
 
-  return 0;
+    result = ASCON128x_set_init_params(&ascon_RX, K, 128, A, 16, 2); // Last argument TBytes is 2 bytes
+    if (result < 0) {
+        return -1;
+    }
+
+    return 0;
 }
 
 int Ascon128::encrypt(const uint8_t *plaintext, int plaintext_len, uint8_t *ciphertext) { // plaintext to data
     int result;
 
-    start[1] = ARM_CM_DWT_CYCCNT;
     result = ASCON128x_set_enc_params(&ascon_TX, (uint8_t *)plaintext, plaintext_len, N, 16);
-    stop[1] = ARM_CM_DWT_CYCCNT;
+
     if (result < 0) {
         return -1;
     }
@@ -120,14 +100,14 @@ int Ascon128::encrypt(const uint8_t *plaintext, int plaintext_len, uint8_t *ciph
         return -1;
     }
 
-    // counter up
-    COUNTER_TX = (COUNTER_TX + 1) % 65536;
-    // increment_nonce_counter(N);
-
     ciphertext[0] = (uint8_t)(COUNTER_TX >> 8); // 2 bytes
     ciphertext[1] = (uint8_t)COUNTER_TX;
     memcpy((uint8_t *)ciphertext + 2, ascon_TX.T, 2);
     memcpy((uint8_t *)ciphertext + 4, ascon_TX.CC, plaintext_len);
+
+    // counter up and nonce advance
+    COUNTER_TX = (COUNTER_TX + 1) % 65536;
+    increment_nonce_counter(N);
 
     return 2 + 2 + ascon_TX.CC_byte_length; // 2 bytes for counter + 2 bytes for T + ciphertext
 }
@@ -140,23 +120,21 @@ int Ascon128::decrypt(const uint8_t *ciphertext, uint8_t ciphertext_len, uint8_t
     COUNTER_RX_new = (ciphertext[0] << 8) | ciphertext[1]; // 2 bytes
     COUNTER_RX_gap = (COUNTER_RX_new - COUNTER_RX + 65536) % 65536;
 
-    if((COUNTER_RX_gap < 3000 && initStatus == 0) || (COUNTER_RX_gap < 500 && initStatus != 0))
-    {
-        // for(int i = 0; i < COUNTER_RX_gap; i++)
-        // {
-        //   increment_nonce_counter(N);
-        // }
-        // increase_nonce_counter_up_to_32bits_increment(N, COUNTER_RX_gap);
-
+    if((COUNTER_RX_gap < 3000 && initStatus == 0) || (COUNTER_RX_gap < 500 && initStatus != 0)) {
+        increase_nonce_counter_up_to_32bits_increment(N, COUNTER_RX_gap);
         COUNTER_RX = COUNTER_RX_new;
-
         initStatus = 1;
     }
-    else
-	{
-        // TODO
-		// 초기화, 비정상적인 상황에 대한 예외처리
-	}
+    else {
+        // 초기화, 비정상적인 상황에 대한 예외처리
+    }
+
+    // DebugSerial.print("Nonce: ");
+    // for (int j = 0; j < 16; j++) {
+    //     DebugSerial.print(N[j], HEX);
+    //     DebugSerial.print(" ");
+    // }
+    // DebugSerial.println(" ");
 
     // Tbits = 16 for nonce sync, so ciphertext + 2 is pointer of gcm_RX.T
     result =  ASCON128x_set_dec_params(&ascon_RX, ciphertext + 4, plaintext_len, N, 16, ciphertext + 2);
@@ -164,9 +142,8 @@ int Ascon128::decrypt(const uint8_t *ciphertext, uint8_t ciphertext_len, uint8_t
         return -1;
     }
 
-    start[2] = ARM_CM_DWT_CYCCNT;
     result = ASCON128x_dec(&ascon_RX);
-    stop[2] = ARM_CM_DWT_CYCCNT;
+
     if (result < 0) {
         return -1;
     }
