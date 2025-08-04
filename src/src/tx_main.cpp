@@ -1399,6 +1399,7 @@ void setup()
     TxHandshake.DoHandle();
   }
   DebugSerial.println("Crypto key exchange done");
+  delay(100);
 #endif
 
   if (setupHardwareFromOptions())
