@@ -90,6 +90,8 @@ volatile unsigned long crypto_processTime = 0;
 volatile unsigned long crypto_processTicks = 0;
 volatile unsigned int crypto_samples = 0;
 
+volatile bool crypto_is_initialized = false;
+
 #if defined(USE_CRYPTO_KEY_EXCHANGE)
 TxHandshakeClass TxHandshake;
 #endif
@@ -573,7 +575,7 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
         injectBackpackPanTiltRollData(now);
         OtaPackChannelData(&otaPkt, ChannelData, TelemetryReceiver.GetCurrentConfirm(), ExpressLRS_currTlmDenom);
 
-        if (crypto && config.GetSecurity() > 0)
+        if (crypto != nullptr && config.GetSecurity() > 0)
         {
           uint8_t rcdata_plaintext[6] = {0};
           uint8_t rcdata_ciphertext[10] = {0};
@@ -592,24 +594,23 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
           }
           memcpy(otaPkt.full.rc_encrypted.raw, rcdata_ciphertext, rcdata_ciphertext_len);
 
-          DebugSerial.print("Encrypted ChannelData: ");
-          for (uint8_t i = 0 ; i < 10; i++)
-          {
-            DebugSerial.print(otaPkt.full.rc_encrypted.raw[i], HEX);
-            DebugSerial.print(" ");
-          }
-          DebugSerial.println();
-
-          if (config.GetSecurity() == 1)
-          {
-              DebugSerial.print("LEA-GCM ");
-          }
-          if (config.GetSecurity() == 2)
-          {
-              DebugSerial.print("ASCON ");
-          }
+          // if (config.GetSecurity() == 1)
+          // {
+          //     DebugSerial.print("LEA-GCM ");
+          // }
+          // if (config.GetSecurity() == 2)
+          // {
+          //     DebugSerial.print("ASCON ");
+          // }
+          // DebugSerial.print("Encrypted TX: ");
+          // for (uint8_t i = 0 ; i < 10; i++)
+          // {
+          //   DebugSerial.print(otaPkt.full.rc_encrypted.raw[i], HEX);
+          //   DebugSerial.print(" ");
+          // }
+          // DebugSerial.println();
         }
-        printChannelData_AIO(ChannelData);
+        // printChannelData_AIO(ChannelData);
       }
     }
   }
@@ -1349,9 +1350,10 @@ static void cyclePower()
 void reconfigureCrypto()
 {
 #if defined(USE_CRYPTO)
-  crypto = &ascon;
   if (config.GetSecurity() == 0) {
+    crypto = nullptr;
     DebugSerial.print("\r\nUsing no crypto\r\n");
+    return;
   }
   else if (config.GetSecurity() == 1) {
     crypto = &lea_gcm;
@@ -1367,9 +1369,11 @@ void reconfigureCrypto()
     size_t K_len = 0; size_t A_len = 0; size_t N_len = 0;
 
     TxHandshake.LeaKey(K, K_len, A, A_len, N, N_len);
-    crypto->init(K, K_len, A, A_len, N, N_len);
+    if (crypto != nullptr && config.GetSecurity() > 0)
+      crypto->init(K, K_len, A, A_len, N, N_len);
   #else
-    crypto->init();
+    if (crypto != nullptr && config.GetSecurity() > 0)
+      crypto->init();
   #endif
 #endif
 }
@@ -1378,6 +1382,7 @@ void setup()
 {
 #if defined(USE_CRYPTO) && defined(USE_CRYPTO_KEY_EXCHANGE)
   setupSerial();
+  DebugSerial.println("\r\nWaiting for crypto key exchange handshake...");
   SX12XX_Radio_Number_t transmittingRadio = Radio.GetLastSuccessfulPacketRadio();
 
   pinMode(GPIO_PIN_LED, OUTPUT);
@@ -1395,7 +1400,7 @@ void setup()
   while (!TxHandshake.IsDone()) {
     TxHandshake.DoHandle();
   }
-  delay(1000);
+  DebugSerial.println("Crypto key exchange done");
 #endif
 
   if (setupHardwareFromOptions())
@@ -1482,6 +1487,7 @@ void setup()
 
 #if defined(USE_CRYPTO)
   reconfigureCrypto();
+  crypto_is_initialized = true;
 #endif
   // config.SetTlm(TLM_RATIO_1_2); // Force TLM ratio of 1:2 for balanced bi-dir link
   // config.SetMotionMode(0); // Ensure motion detection is off

@@ -235,6 +235,8 @@ volatile unsigned long crypto_processTime = 0;
 volatile uint32_t long crypto_processTicks = 0;
 volatile unsigned int crypto_samples = 0;
 
+volatile bool crypto_is_initialized = false;
+
 ECDH rxEcdh;
 #if defined(USE_CRYPTO_KEY_EXCHANGE)
 RxHandshakeClass RxHandshake;
@@ -881,23 +883,6 @@ bool ICACHE_RAM_ATTR UnpackChannelDataEncrypted(OTA_Packet_s const * const otaPk
     return ota8->rc.telemetryStatus;
 }
 
-bool ICACHE_RAM_ATTR OtaUnpackChannelData_AIO(OTA_Packet_s const * const otaPktPtr, uint8_t *channelData, uint8_t const tlmDenom)
-{
-    (void)tlmDenom;
-
-    OTA_Packet8_s const * const ota8 = (OTA_Packet8_s const * const)otaPktPtr;
-    uint8_t rcDecrypted[LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE] = { 0 };
-    // crypto->decrypt(ota8.full.rc_encrypted.raw, rcDecrypted, LEA_ADD_PACKET_SIZE + OTA8_PACKET_SIZE);
-    // rc decrypted to channelData
-
-    memcpy(channelData, ota8, 11); // TODO - this is a hack, we should be able to copy the whole packet
-    ChannelData[4] = BIT_to_CRSF(ota8->rc.ch4);
-
-    // Restore the uplink_TX_Power range 0-7 -> 1-8
-    CRSF::updateUplinkPower(ota8->rc.uplinkPower + 1);
-    return ota8->rc.telemetryStatus;
-}
-
 static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPktPtr)
 {
     // Must be fully connected to process RC packets, prevents processing RC
@@ -910,7 +895,6 @@ static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPkt
     if (otaPktPtr->full.rc_encrypted.securityType >= 1 && otaPktPtr->full.rc_encrypted.free == 0 && otaPktPtr->full.rc_encrypted.isHighAux == 0)
     {
         telemetryConfirmValue = UnpackChannelDataEncrypted(otaPktPtr, ChannelDataEncrypted, ExpressLRS_currTlmDenom);
-        // telemetryConfirmValue = OtaUnpackChannelData_AIO(otaPktPtr, ChannelData, ExpressLRS_currTlmDenom); // AIO
         securityType = otaPktPtr->full.rc_encrypted.securityType;
     }
     else
@@ -923,7 +907,7 @@ static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPkt
         uint8_t rcdata_plaintext[6] = {0};
         OTA_Packet_s otaPkt = {0};
 
-        if (crypto && config.GetSecurity() > 0)
+        if (crypto != nullptr && config.GetSecurity() > 0)
         {
             memcpy(&otaPkt, otaPktPtr, sizeof(OTA_Packet_s));
             memcpy(rcdata_ciphertext, otaPktPtr->full.rc_encrypted.raw, sizeof(otaPktPtr->full.rc_encrypted.raw));
@@ -935,14 +919,14 @@ static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPkt
 
             memcpy(&otaPkt.full.rc_encrypted.raw[0], rcdata_plaintext, rcdata_plaintext_len);
 
-            DebugSerial.print("Encrypted ChannelData: ");
-            for (uint8_t i = 0 ; i < 10; i++)
-            {
-              DebugSerial.print(otaPktPtr->full.rc_encrypted.raw[i], HEX);
-              DebugSerial.print(" ");
-            }
-            DebugSerial.println();
-
+        //     DebugSerial.print("Encrypted RX: ");
+        //     for (uint8_t i = 0 ; i < 10; i++)
+        //     {
+        //       DebugSerial.print(otaPktPtr->full.rc_encrypted.raw[i], HEX);
+        //       DebugSerial.print(" ");
+        //     }
+        //     DebugSerial.println();
+        //
             telemetryConfirmValue = OtaUnpackChannelData_RCDATA_AIO(&otaPkt, ChannelData, ExpressLRS_currTlmDenom);
             if (config.GetSecurity() == 1)
             {
@@ -954,7 +938,7 @@ static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPkt
             }
         }
 
-        DebugSerial.print("RX ChannelData: ");
+        DebugSerial.print("RX: ");
         for (uint8_t i = 0; i < 9; i++)
         {
             DebugSerial.print(ChannelData[i]);
@@ -1501,9 +1485,10 @@ void reconfigureSerial()
 void reconfigureCrypto()
 {
 #if defined(USE_CRYPTO)
-  crypto = &ascon;
   if (config.GetSecurity() == 0) {
+    crypto = nullptr;
     DebugSerial.print("\r\nUsing no crypto\r\n");
+    return;
   }
   else if (config.GetSecurity() == 1) {
     crypto = &lea_gcm;
@@ -1519,10 +1504,18 @@ void reconfigureCrypto()
     size_t K_len = 0; size_t A_len = 0; size_t N_len = 0;
 
     RxHandshake.LeaKey(K, K_len, A, A_len, N, N_len);
-    crypto->init(K, K_len, A, A_len, N, N_len);
+    if (crypto != nullptr && config.GetSecurity() > 0)
+        crypto->init(K, K_len, A, A_len, N, N_len);
   #else
-    crypto->init();
+    if (crypto != nullptr && config.GetSecurity() > 0)
+        crypto->init();
   #endif
+  if (crypto_is_initialized == true) // Use this for change crypto settings, when crypto is changed, go to power reset
+  {
+    deferExecution(1000, []() {
+        HAL_NVIC_SystemReset();
+    });
+  }
 #endif
 }
 
@@ -1876,6 +1869,7 @@ void setup()
 {
 #if defined(USE_CRYPTO) && defined(USE_CRYPTO_KEY_EXCHANGE)
   setupSerial();
+  DebugSerial.println("\r\nWaiting for crypto key exchange handshake...");
   delay(4000); // When using LEA key exchange, the RX must be powered up after the TX
                // Wait up to 3~4 seconds(TX red LED turns on) after hearing the 'WELCOME TO EDGE TX' message from RC transmitter and then power up the RX radio.
   Radio.Begin();
@@ -1890,6 +1884,7 @@ void setup()
   while (!RxHandshake.IsDone()) {
     RxHandshake.DoHandle();
   }
+  DebugSerial.println("Crypto key exchange done");
 #endif
 
     #if defined(TARGET_UNIFIED_RX)
@@ -1974,6 +1969,7 @@ void setup()
 
 #if defined(USE_CRYPTO)
   reconfigureCrypto();
+  crypto_is_initialized = true;
 #endif
     }
 

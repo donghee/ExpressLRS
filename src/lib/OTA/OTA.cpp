@@ -385,7 +385,7 @@ void printChannelData_AIO(uint32_t *ChannelData) {
   PackUInt11ToChannels4x2(&crsf_channelData_ch5_ch12, &channelData_ch5_ch12, false);
   UnpackChannels4x2ToUInt11(channelData_ch5_ch12, &channelData[5], false);
 
-  DebugSerial.print("TX ChannelData: ");
+  DebugSerial.print("TX: ");
   for (int i = 0; i < 9; i++) {
     DebugSerial.print(channelData[i]);
     DebugSerial.print(" ");
