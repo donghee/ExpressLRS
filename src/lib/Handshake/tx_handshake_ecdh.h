@@ -54,7 +54,7 @@ class TxHandshakeClass {
         break;
       case WAIT_HELLO:
         if (millis() > timeout) {
-            DebugSerial.println("TX: Timeout waiting for hello, restarting handshake");
+            DBGLN("TX: Timeout waiting for hello, restarting handshake");
             tx_handshake_state_ = INIT;
         }
         break;
@@ -62,13 +62,13 @@ class TxHandshakeClass {
         tx_handshake_state_ = SEND_HELLO;
         break;
       case SEND_HELLO:
-        DebugSerial.println("send hello");
+        DBGLN("send hello");
         handshake_hello();
         while (Busy()) {}
         tx_handshake_state_ = SEND_ECDH_PUB_KEY;
         break;
       case SEND_ECDH_PUB_KEY:
-        DebugSerial.println("send ecdh pub key");
+        DBGLN("send ecdh pub key");
         for (int i = 0; i < 32; i++) {
           DebugSerial.printf("%02x", pub_key_[i]);
         }
@@ -82,13 +82,13 @@ class TxHandshakeClass {
         break;
       case WAIT_ECDH_PUB_KEY:
         if (millis() > timeout) {
-          DebugSerial.println("TX: Timeout waiting for ECDH public key, restarting handshake");
+          DBGLN("TX: Timeout waiting for ECDH public key, restarting handshake");
           tx_handshake_state_ = SEND_ECDH_PUB_KEY;
         }
 
        break;
       case RECV_ECDH_PUB_KEY:
-        DebugSerial.println("recv ecdh pub key");
+        DBGLN("recv ecdh pub key");
         for (i = 0; i < 32; i++) {
           DebugSerial.printf("%02x", Radio.RXdataBuffer[i]);
         }
@@ -97,14 +97,13 @@ class TxHandshakeClass {
         tx_handshake_state_ = SEND_BYE;
         break;
       case SEND_BYE:
-        DebugSerial.println("send bye");
-        // send 3 bye messages to ensure the receiver gets it
-        handshake_bye();
-        while (Busy()) {}
-        handshake_bye();
-        while (Busy()) {}
-        handshake_bye();
-        while (Busy()) {}
+        DBGLN("send bye");
+        // send five bye messages to ensure the receiver gets it
+        handshake_bye(); while (Busy()) {}
+        handshake_bye(); while (Busy()) {}
+        handshake_bye(); while (Busy()) {}
+        handshake_bye(); while (Busy()) {}
+        handshake_bye(); while (Busy()) {}
         tx_handshake_state_ = DONE;
         break;
       case DONE:
@@ -113,7 +112,7 @@ class TxHandshakeClass {
         break;
     }
     if (millis() > handle_timeout) {
-      DebugSerial.println("RX: Timeout waiting for handshake, restarting");
+      DBGLN("RX: Timeout waiting for handshake, restarting");
       tx_handshake_state_ = INIT;
     }
   };
@@ -121,7 +120,7 @@ class TxHandshakeClass {
   void TXdoneCallback() { Busy(false); };
 
   bool RXdoneCallback(SX12xxDriverCommon::rx_status const status) {
-    DebugSerial.println("->RXdoneCallback");
+    DBGLN("->RXdoneCallback");
     if (State() == WAIT_HELLO) {
       HandleWaitHello();
       return true;
@@ -135,7 +134,7 @@ class TxHandshakeClass {
 
   void HandleWaitHello() {
     if (memcmp(Radio.RXdataBuffer, "hello", 5) == 0) {
-      DebugSerial.println("got hello");
+      DBGLN("got hello");
       tx_handshake_state_ = RECV_HELLO;
       return;
     }
@@ -145,7 +144,7 @@ class TxHandshakeClass {
 
   void HandleWaitEcdhPubKey() {
     // if (Radio.RXdataBuffer[0] == 0xEC) {
-     DebugSerial.println("got ecdh pub key");
+     DBGLN("got ecdh pub key");
      tx_handshake_state_ = RECV_ECDH_PUB_KEY;
      return;
     // }
@@ -156,12 +155,6 @@ class TxHandshakeClass {
   int LeaKey(uint8_t *K, size_t &K_len, uint8_t *A, size_t &A_len, uint8_t *N,
              size_t &N_len) {
     if (State() != DONE) return -1;
-    memcpy(K, K_, 16);
-    memcpy(A, A_, 16);
-    memcpy(N, N_, 16);
-    K_len = 16;
-    A_len = 16;
-    N_len = 16;
 
     txEcdh.generate_secret_key((const char *)rx_compressed_public_key_, rx_compressed_public_key_len_);
     txEcdh.export_secret_key(tx_secret_key, &tx_secret_key_len);
@@ -170,6 +163,17 @@ class TxHandshakeClass {
       DebugSerial.printf("%02x", tx_secret_key[i]);
     }
     DebugSerial.println();
+
+    memcpy(K_, tx_secret_key, 16);
+    memcpy(A_, tx_secret_key + 16, 16);
+    memcpy(N_, tx_secret_key + 8, 16);
+
+    memcpy(K, K_, 16);
+    memcpy(A, A_, 16);
+    memcpy(N, N_, 16);
+    K_len = 16;
+    A_len = 16;
+    N_len = 16;
 
     return 0;
   }

@@ -50,7 +50,7 @@ class RxHandshakeClass {
         handle_timeout = millis() + 10000;  // wait for 10 seconds
         break;
       case SEND_HELLO:
-        DebugSerial.println("send hello");
+        DBGLN("send hello");
         handshake_hello();
         while (Busy()) {}
         rx_handshake_state_ = WAIT_HELLO;
@@ -59,7 +59,7 @@ class RxHandshakeClass {
         break;
       case WAIT_HELLO:
         if (millis() > timeout) {
-          DebugSerial.println("RX: Timeout waiting for hello, restarting handshake");
+          DBGLN("RX: Timeout waiting for hello, restarting handshake");
           rx_handshake_state_ = INIT;
         }
         break;
@@ -70,12 +70,12 @@ class RxHandshakeClass {
         break;
       case WAIT_ECDH_PUB_KEY:
         if (millis() > timeout) {
-          DebugSerial.println("RX: Timeout waiting for ECDH public key, restarting handshake");
+          DBGLN("RX: Timeout waiting for ECDH public key, restarting handshake");
           rx_handshake_state_ = RECV_HELLO;
         }
         break;
       case RECV_ECDH_PUB_KEY:
-        DebugSerial.println("recv ecdh pub key");
+        DBGLN("recv ecdh pub key");
         for (int i = 0; i < 32; i++) {
           DebugSerial.printf("%02x", Radio.RXdataBuffer[i]);
         }
@@ -84,7 +84,7 @@ class RxHandshakeClass {
         rx_handshake_state_ = SEND_ECDH_PUB_KEY;
         break;
       case SEND_ECDH_PUB_KEY:
-        DebugSerial.println("send ecdh pub key");
+        DBGLN("send ecdh pub key");
         for (int i = 0; i < 32; i++) {
           DebugSerial.printf("%02x", pub_key_[i]);
         }
@@ -98,7 +98,7 @@ class RxHandshakeClass {
         break;
       case WAIT_BYE:
         if (millis() > timeout) {
-          DebugSerial.println("RX: Timeout waiting for bye, restarting handshake");
+          DBGLN("RX: Timeout waiting for bye, restarting handshake");
           rx_handshake_state_ = SEND_ECDH_PUB_KEY;
         }
        break;
@@ -108,7 +108,7 @@ class RxHandshakeClass {
         break;
     }
     if (millis() > handle_timeout) {
-      DebugSerial.println("RX: Timeout waiting for handshake, restarting");
+      DBGLN("RX: Timeout waiting for handshake, restarting");
       rx_handshake_state_ = INIT;
     }
   };
@@ -116,7 +116,7 @@ class RxHandshakeClass {
   void TXdoneCallback() { Busy(false); };
 
   bool RXdoneCallback(SX12xxDriverCommon::rx_status const status) {
-    DebugSerial.println("->RXdoneCallback");
+    DBGLN("->RXdoneCallback");
     if (State() == WAIT_HELLO) {
       HandleWaitHello();
       return true;
@@ -134,12 +134,6 @@ class RxHandshakeClass {
   int LeaKey(uint8_t *K, size_t &K_len, uint8_t *A, size_t &A_len, uint8_t *N,
              size_t &N_len) {
     if (State() != DONE) return -1;
-    memcpy(K, K_, 16);
-    memcpy(A, A_, 16);
-    memcpy(N, N_, 16);
-    K_len = 16;
-    A_len = 16;
-    N_len = 16;
 
     rxEcdh.generate_secret_key((const char *)tx_compressed_public_key_, tx_compressed_public_key_len_);
     rxEcdh.export_secret_key(rx_secret_key, &rx_secret_key_len);
@@ -147,7 +141,18 @@ class RxHandshakeClass {
     for (size_t i = 0; i < 32; i++) {
       DebugSerial.printf("%02x", rx_secret_key[i]);
     }
-    DebugSerial.println();
+    DebugSerial.println("\r\n");
+
+    memcpy(K_, rx_secret_key, 16);
+    memcpy(A_, rx_secret_key + 16, 16);
+    memcpy(N_, rx_secret_key + 8, 16);
+
+    memcpy(K, K_, 16);
+    memcpy(A, A_, 16);
+    memcpy(N, N_, 16);
+    K_len = 16;
+    A_len = 16;
+    N_len = 16;
 
     return 0;
   }
@@ -178,7 +183,7 @@ class RxHandshakeClass {
 
   void HandleWaitHello() {
     if (memcmp(Radio.RXdataBuffer, "hello", 5) == 0) {
-      DebugSerial.println("got hello");
+      DBGLN("got hello");
       rx_handshake_state_ = RECV_HELLO;
       return;
     }
@@ -188,7 +193,7 @@ class RxHandshakeClass {
 
   void HandleWaitEcdhPubKey() {
     // if (Radio.RXdataBuffer[0] == 0xEC) {
-      DebugSerial.println("got ecdh pub key");
+      DBGLN("got ecdh pub key");
       rx_handshake_state_ = RECV_ECDH_PUB_KEY;
       return;
     // }
@@ -198,7 +203,7 @@ class RxHandshakeClass {
 
   void HandleWaitBye() {
     if (memcmp(Radio.RXdataBuffer, "bye", 3) == 0) {
-      DebugSerial.println("got bye");
+      DBGLN("got bye");
       rx_handshake_state_ = DONE;
       return;
     }
