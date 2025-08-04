@@ -90,8 +90,6 @@ volatile unsigned long crypto_processTime = 0;
 volatile unsigned long crypto_processTicks = 0;
 volatile unsigned int crypto_samples = 0;
 
-volatile bool crypto_is_initialized = false;
-
 #if defined(USE_CRYPTO_KEY_EXCHANGE)
 TxHandshakeClass TxHandshake;
 #endif
@@ -495,6 +493,10 @@ void injectBackpackPanTiltRollData(uint32_t const now)
 
 void ICACHE_RAM_ATTR SendRCdataToRF()
 {
+  uint8_t rcdata_plaintext[6] = {0};
+  uint8_t rcdata_ciphertext[10] = {0};
+  int8_t rcdata_ciphertext_len = 0;
+
   uint32_t const now = millis();
   // ESP requires word aligned buffer
   WORD_ALIGNED_ATTR OTA_Packet_s otaPkt = {0};
@@ -577,10 +579,6 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
 
         if (crypto != nullptr && config.GetSecurity() > 0)
         {
-          uint8_t rcdata_plaintext[6] = {0};
-          uint8_t rcdata_ciphertext[10] = {0};
-          uint8_t rcdata_ciphertext_len = 0;
-
           OtaPackChannelData_RCDATA_AIO(rcdata_plaintext, ChannelData,
                                         TelemetryReceiver.GetCurrentConfirm(),
                                         ExpressLRS_currTlmDenom, otaPkt.full.rc_encrypted.isHighAux);
@@ -1487,7 +1485,6 @@ void setup()
 
 #if defined(USE_CRYPTO)
   reconfigureCrypto();
-  crypto_is_initialized = true;
 #endif
   // config.SetTlm(TLM_RATIO_1_2); // Force TLM ratio of 1:2 for balanced bi-dir link
   // config.SetMotionMode(0); // Ensure motion detection is off

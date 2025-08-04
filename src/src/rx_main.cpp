@@ -235,8 +235,6 @@ volatile unsigned long crypto_processTime = 0;
 volatile uint32_t long crypto_processTicks = 0;
 volatile unsigned int crypto_samples = 0;
 
-volatile bool crypto_is_initialized = false;
-
 ECDH rxEcdh;
 #if defined(USE_CRYPTO_KEY_EXCHANGE)
 RxHandshakeClass RxHandshake;
@@ -885,6 +883,12 @@ bool ICACHE_RAM_ATTR UnpackChannelDataEncrypted(OTA_Packet_s const * const otaPk
 
 static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPktPtr)
 {
+    uint8_t rcdata_ciphertext[10] = {0};
+    int8_t rcdata_ciphertext_len = 0;
+    uint8_t rcdata_plaintext[6] = {0};
+    int8_t rcdata_plaintext_len = 0;
+    OTA_Packet_s otaPkt = {0};
+
     // Must be fully connected to process RC packets, prevents processing RC
     // during sync, where packets can be received before connection
     if (connectionState != connected || SwitchModePending)
@@ -901,12 +905,6 @@ static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPkt
     {
         telemetryConfirmValue = OtaUnpackChannelData(otaPktPtr, ChannelData, ExpressLRS_currTlmDenom);
 
-        uint8_t rcdata_ciphertext[10] = {0};
-        uint8_t rcdata_ciphertext_len = 0;
-        uint8_t rcdata_plaintext_len = 0;
-        uint8_t rcdata_plaintext[6] = {0};
-        OTA_Packet_s otaPkt = {0};
-
         if (crypto != nullptr && config.GetSecurity() > 0)
         {
             memcpy(&otaPkt, otaPktPtr, sizeof(OTA_Packet_s));
@@ -915,18 +913,18 @@ static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPkt
             if (rcdata_plaintext_len == -1)
             {
                 DBGLN("RC data decryption failed");
+                return;
             }
-
             memcpy(&otaPkt.full.rc_encrypted.raw[0], rcdata_plaintext, rcdata_plaintext_len);
 
-        //     DebugSerial.print("Encrypted RX: ");
-        //     for (uint8_t i = 0 ; i < 10; i++)
-        //     {
-        //       DebugSerial.print(otaPktPtr->full.rc_encrypted.raw[i], HEX);
-        //       DebugSerial.print(" ");
-        //     }
-        //     DebugSerial.println();
-        //
+            // DebugSerial.print("Encrypted RX: ");
+            // for (uint8_t i = 0 ; i < 10; i++)
+            // {
+            //   DebugSerial.print(otaPktPtr->full.rc_encrypted.raw[i], HEX);
+            //   DebugSerial.print(" ");
+            // }
+            // DebugSerial.println();
+
             telemetryConfirmValue = OtaUnpackChannelData_RCDATA_AIO(&otaPkt, ChannelData, ExpressLRS_currTlmDenom);
             if (config.GetSecurity() == 1)
             {
@@ -1510,12 +1508,6 @@ void reconfigureCrypto()
     if (crypto != nullptr && config.GetSecurity() > 0)
         crypto->init();
   #endif
-  if (crypto_is_initialized == true) // Use this for change crypto settings, when crypto is changed, go to power reset
-  {
-    deferExecution(1000, []() {
-        HAL_NVIC_SystemReset();
-    });
-  }
 #endif
 }
 
@@ -1969,7 +1961,6 @@ void setup()
 
 #if defined(USE_CRYPTO)
   reconfigureCrypto();
-  crypto_is_initialized = true;
 #endif
     }
 

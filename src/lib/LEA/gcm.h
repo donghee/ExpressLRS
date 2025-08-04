@@ -16,12 +16,6 @@ extern "C"
 
 #define LEA_ADD_PACKET_SIZE 4 // 2 bytes for counter, 2 bytes for T
 
-// Measurement of lea encryption and decryption time
-#define  ARM_CM_DEMCR      (*(uint32_t *)0xE000EDFC)
-#define  ARM_CM_DWT_CTRL   (*(uint32_t *)0xE0001000)
-#define  ARM_CM_DWT_CYCCNT (*(uint32_t *)0xE0001004)
-
-
 /*  LEA GCM encryption and decryption
  */
 class GCM : public Crypto
@@ -30,7 +24,6 @@ private:
     GCM_st gcm_TX;
     GCM_st gcm_RX;
 
-    // LEA-128
     uint8_t K[16] = {0x14, 0x87, 0x0B, 0x99, 0x92, 0xEA, 0x89, 0x67, 0x8A, 0x1D, 0xDF, 0xD6, 0x30, 0x91, 0x8D, 0xF0};
     uint8_t A[16] = {0, };
     // uint8_t N[12] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B};
@@ -49,14 +42,9 @@ private:
     void increment_nonce_counter(uint8_t *nonce);
     void increase_nonce_counter_up_to_32bits_increment(uint8_t *nonce, uint32_t increment);
 
-
-    // Measurement of lea encryption and decryption time
-    uint32_t  start[3];
-    uint32_t  stop[3];
-    uint32_t  delta[3];
-
 public:
     GCM();
+
     int init();
     int init(const uint8_t* K_, uint32_t K_len_, const uint8_t* A_, uint32_t A_len_, uint8_t *N_, size_t N_len_);
 

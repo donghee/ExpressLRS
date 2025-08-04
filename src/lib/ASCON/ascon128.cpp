@@ -11,9 +11,6 @@ Ascon128::Ascon128() {
     ASCON128x_reset(&ascon_RX);
 }
 
-Ascon128::~Ascon128() {
-}
-
 void Ascon128::increment_nonce_counter(uint8_t *nonce)
 {
     int i;
