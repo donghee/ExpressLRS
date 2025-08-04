@@ -1,7 +1,6 @@
+#include <fstream>
 #include "gcm.h"
 #include "OTA.h"
-
-#include <fstream>
 
 extern HardwareSerial DebugSerial;
 
@@ -11,7 +10,7 @@ GCM::GCM()
 
 void GCM::increment_nonce_counter(uint8_t *nonce)
 {
-	int i;
+    int i;
     for (i = 15; i >= 0; --i)
     {
         if (++nonce[i] != 0)
@@ -23,15 +22,15 @@ void GCM::increment_nonce_counter(uint8_t *nonce)
 
 void GCM::increase_nonce_counter_up_to_32bits_increment(uint8_t *nonce, uint32_t increment)
 {
-	int i;
-	uint32_t carry = increment;
-	uint32_t temp;
+    int i;
+    uint32_t carry = increment;
+    uint32_t temp;
 
     for (i = 15; i >= 0; --i)
     {
-    	temp = nonce[i] + carry;
-    	nonce[i] = (uint8_t)temp;
-    	carry = temp >> 8;
+        temp = nonce[i] + carry;
+        nonce[i] = (uint8_t)temp;
+        carry = temp >> 8;
         if (carry == 0)
         {
             break;
@@ -60,9 +59,9 @@ int GCM::init()
     int result;
 
     // 카운터 초기화, initStatus 초기화
-	COUNTER_TX = 0;
-	COUNTER_RX = 0;
-	initStatus = 0;
+    COUNTER_TX = 0;
+    COUNTER_RX = 0;
+    initStatus = 0;
 
     // Kbits= 128, Abytes=16, Tbits = 16
     result = GCM4LEA_set_init_params(&gcm_TX, K, 128, A, 16, 16); // Last argument Tbits is 16
@@ -86,17 +85,17 @@ int GCM::decrypt(const uint8_t *ciphertext, uint8_t ciphertext_len, uint8_t *pla
     uint32_t plaintext_len = ciphertext_len - (2 + 2);
 
     // counter up
-	COUNTER_RX_new = (ciphertext[0] << 8) | ciphertext[1]; // 2 bytes
-	COUNTER_RX_gap = (COUNTER_RX_new - COUNTER_RX + 65536) % 65536;
+    COUNTER_RX_new = (ciphertext[0] << 8) | ciphertext[1]; // 2 bytes
+    COUNTER_RX_gap = (COUNTER_RX_new - COUNTER_RX + 65536) % 65536;
 
     if((COUNTER_RX_gap < 3000 && initStatus == 0) || (COUNTER_RX_gap < 500 && initStatus != 0)) {
         increase_nonce_counter_up_to_32bits_increment(N, COUNTER_RX_gap);
-		COUNTER_RX = COUNTER_RX_new;
+        COUNTER_RX = COUNTER_RX_new;
         initStatus = 1;
-	}
-	else {
-		// 초기화, 비정상적인 상황에 대한 예외처리
-	}
+    }
+    else {
+        // 초기화, 비정상적인 상황에 대한 예외처리
+    }
 
     // DebugSerial.print("Nonce: ");
     // for (int j = 0; j < 16; j++) {
@@ -106,7 +105,7 @@ int GCM::decrypt(const uint8_t *ciphertext, uint8_t ciphertext_len, uint8_t *pla
     // DebugSerial.println(" ");
 
     // Tbits = 16 for nonce sync, so ciphertext + 2 is pointer of gcm_RX.T
-   	result =  GCM4LEA_set_dec_params(&gcm_RX, ciphertext + 4, plaintext_len, N_GCM, 12, ciphertext + 2);
+    result =  GCM4LEA_set_dec_params(&gcm_RX, ciphertext + 4, plaintext_len, N_GCM, 12, ciphertext + 2);
     if (result < 0) {
         return -1;
     }

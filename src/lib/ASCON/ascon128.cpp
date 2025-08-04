@@ -1,8 +1,6 @@
-#include "ascon128.h"
-
 #include <fstream>
-
 #include <Arduino.h>
+#include "ascon128.h"
 
 extern HardwareSerial DebugSerial;
 
