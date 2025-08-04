@@ -1874,7 +1874,7 @@ void setup()
                // Wait up to 3~4 seconds(TX red LED turns on) after hearing the 'WELCOME TO EDGE TX' message from RC transmitter and then power up the RX radio.
   Radio.Begin();
   Radio.Config(SX1280_LORA_BW_0800, SX1280_LORA_SF6, SX1280_LORA_CR_LI_4_8,
-               0xba1b91, 12, true, DATA_SIZE, 20000, 0, 0, 0);
+               0xba1b91, 12, true, HANDSHAKE_DATA_SIZE, 20000, 0, 0, 0);
   Radio.RXdoneCallback = &RXdoneISR;
   Radio.TXdoneCallback = &TXdoneISR;
   Radio.SetFrequencyHz(2420000000, Radio.GetLastSuccessfulPacketRadio());

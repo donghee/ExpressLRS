@@ -1390,7 +1390,7 @@ void setup()
 
   Radio.Begin();
   Radio.Config(SX1280_LORA_BW_0800, SX1280_LORA_SF6, SX1280_LORA_CR_LI_4_8,
-               0xba1b91, 12, true, DATA_SIZE, 20000, 0, 0, 0);
+               0xba1b91, 12, true, HANDSHAKE_DATA_SIZE, 20000, 0, 0, 0);
   Radio.TXdoneCallback = &TXdoneISR;
   Radio.RXdoneCallback = &RXdoneISR;
   Radio.SetFrequencyHz(2420000000, transmittingRadio);

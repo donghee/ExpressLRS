@@ -8,7 +8,7 @@
 #include "common.h"
 #include "uECDH.h"
 
-#define DATA_SIZE 32
+#define HANDSHAKE_DATA_SIZE 34
 
 extern HardwareSerial DebugSerial;
 
@@ -34,7 +34,7 @@ class TxHandshakeClass {
     transmitting_radio_ = Radio.GetLastSuccessfulPacketRadio();
 
     txEcdh.init();
-    txEcdh.compress_public_key(pub_key_, &pub_key_len_);
+    txEcdh.get_public_key(pub_key_, &pub_key_len_);
   }
 
   inline bool IsDone() { return tx_handshake_state_ == DONE; };
@@ -68,14 +68,13 @@ class TxHandshakeClass {
         tx_handshake_state_ = SEND_ECDH_PUB_KEY;
         break;
       case SEND_ECDH_PUB_KEY:
-        DBGLN("send ecdh pub key");
-        for (int i = 0; i < 32; i++) {
-          DebugSerial.printf("%02x", pub_key_[i]);
-        }
-        DebugSerial.println();
-
-        handshake_send_ecdh_pub_key();
+        DBGLN("send ecdh pub key 0");
+        handshake_send_ecdh_pub_key0();
         while (Busy()) {}
+        DBGLN("send ecdh pub key 1");
+        handshake_send_ecdh_pub_key1();
+        while (Busy()) {}
+
         tx_handshake_state_ = WAIT_ECDH_PUB_KEY;
         timeout = millis() + 100;  // wait for 0.1 seconds
         Radio.RXnb();
@@ -89,11 +88,12 @@ class TxHandshakeClass {
        break;
       case RECV_ECDH_PUB_KEY:
         DBGLN("recv ecdh pub key");
-        for (i = 0; i < 32; i++) {
-          DebugSerial.printf("%02x", Radio.RXdataBuffer[i]);
+        for (int i = 0; i < 64; i++) {
+            DebugSerial.printf("%02x", (uint8_t)rx_public_key_[i]);
         }
         DebugSerial.println();
-        memcpy(rx_compressed_public_key_, Radio.RXdataBuffer, 32);
+        delay(1);
+
         tx_handshake_state_ = SEND_BYE;
         break;
       case SEND_BYE:
@@ -108,7 +108,7 @@ class TxHandshakeClass {
         break;
       case DONE:
         digitalWrite(GPIO_PIN_LED, !digitalRead(GPIO_PIN_LED));
-        tx_handshake_state_ = INIT;
+        // tx_handshake_state_ = INIT;
         break;
     }
     if (millis() > handle_timeout) {
@@ -143,12 +143,19 @@ class TxHandshakeClass {
   };
 
   void HandleWaitEcdhPubKey() {
-    // if (Radio.RXdataBuffer[0] == 0xEC) {
-     DBGLN("got ecdh pub key");
-     tx_handshake_state_ = RECV_ECDH_PUB_KEY;
-     return;
-    // }
-
+    if (Radio.RXdataBuffer[0] == 0xEC) {
+      if (Radio.RXdataBuffer[1] == 0) {
+        DBGLN("got ecdh pub key 0");
+        memcpy(rx_public_key_, Radio.RXdataBuffer + 2, 32);
+        tx_handshake_state_ = WAIT_ECDH_PUB_KEY;
+        Radio.RXnb();
+      } else if (Radio.RXdataBuffer[1] == 1) {
+        DBGLN("got ecdh pub key 1");
+        memcpy(rx_public_key_ + 32, Radio.RXdataBuffer + 2, 32);
+        rx_public_key_len_ = 64;
+        tx_handshake_state_ = RECV_ECDH_PUB_KEY;
+      }
+    }
     // Radio.RXnb();
   };
 
@@ -156,7 +163,7 @@ class TxHandshakeClass {
              size_t &N_len) {
     if (State() != DONE) return -1;
 
-    txEcdh.generate_secret_key((const char *)rx_compressed_public_key_, rx_compressed_public_key_len_);
+    txEcdh.generate_secret_key((const char *)rx_public_key_, rx_public_key_len_);
     txEcdh.export_secret_key(tx_secret_key, &tx_secret_key_len);
     DebugSerial.print("\r\nTX secret key: ");
     for (size_t i = 0; i < 32; i++) {
@@ -192,14 +199,20 @@ class TxHandshakeClass {
     Radio.TXnb((uint8_t *)"hello", 5, transmitting_radio_);
   };
 
-  void handshake_send_ecdh_pub_key() {
-    // unsigned char buffer_[DATA_SIZE] = {0xEC, 0xD0, 0x0, };
+  void handshake_send_ecdh_pub_key0() {
     Busy(true);
-    // buffer_[2] = pub_key_len_;
-    // memcpy(buffer_ + 3, pub_key_, pub_key_len_);
-    // Radio.TXnb(buffer_, sizeof(buffer_), transmitting_radio_);
-    // Radio.TXnb(pub_key_, pub_key_len_, transmitting_radio_);
-    Radio.TXnb(pub_key_, 32, transmitting_radio_);
+    tx_buffer[0] = 0xEC; // prefix for ECDH public key
+    tx_buffer[1] = 0;
+    memcpy(tx_buffer+2, pub_key_, 32);
+    Radio.TXnb(tx_buffer, 32+2, transmitting_radio_);
+  };
+
+  void handshake_send_ecdh_pub_key1() {
+    Busy(true);
+    tx_buffer[0] = 0xEC; // prefix for ECDH public key
+    tx_buffer[1] = 1;
+    memcpy(tx_buffer+2, pub_key_+32, 32);
+    Radio.TXnb(tx_buffer, 32+2, transmitting_radio_);
   };
 
   void handshake_bye() {
@@ -216,27 +229,18 @@ class TxHandshakeClass {
   uint8_t A_[16] = {0};
   uint8_t N_[16] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F };
 
-
   // ecdh
   unsigned char pub_key_[64] = {0};
   size_t pub_key_len_ = 0;
-  unsigned char rx_compressed_public_key_[64] = {0};
-  size_t rx_compressed_public_key_len_ = 0;
-  int pub_key_msg_num_ = 0;
+  unsigned char rx_public_key_[64] = {0};
+  size_t rx_public_key_len_ = 0;
 
   uint8_t tx_secret_key[32];
   size_t tx_secret_key_len = 0;
 
   ECDH txEcdh;
 
-  // handshake
-  StubbornSender sender_;
-  volatile uint8_t package_index_;
-  volatile int pub_key_msg_seq_ = 0;
-  uint8_t data[8];
-  volatile bool confirm_value_ = true;
-  uint32_t pub_key_timeout_ = 10;
-  uint32_t lea_key_timeout_ = 10;
-
   SX12XX_Radio_Number_t transmitting_radio_;
+  // tx buffer for radio transmission
+  uint8_t tx_buffer[HANDSHAKE_DATA_SIZE] = {0};
 };
