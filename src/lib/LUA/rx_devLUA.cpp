@@ -352,7 +352,9 @@ static void registerLuaParameters()
     config.SetSecurity(arg);
     if (config.IsModified()) {
       deferExecution(1000, [](){
-        // Reconfigure serial to apply the new security settings
+        // Reconfigure serial to apply the new security settings from LUA UI
+        // This is needed to reconfigure and initialize the crypto settings, and counter
+        // Written by Donghee Park (DRONEMAP)
         reconfigureCrypto();
       });
     }

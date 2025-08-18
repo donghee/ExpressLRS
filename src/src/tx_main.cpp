@@ -90,6 +90,7 @@ volatile unsigned long crypto_processTime = 0;
 volatile unsigned long crypto_processTicks = 0;
 volatile unsigned int crypto_samples = 0;
 
+// ECDH key exchange handshake manager for secure communication - Written by: Donghee Park (DRONEMAP)
 #if defined(USE_CRYPTO_KEY_EXCHANGE)
 TxHandshakeClass TxHandshake;
 #endif
@@ -579,11 +580,23 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
 
         if (crypto != nullptr && config.GetSecurity() > 0)
         {
+          // Pack 8 channels into 6 bytes of RC data
+          // Packs RC channel data into AIO format with 4x10-bit low channels(4CH) and 4x2-bit high channels(4CH)
+          //
+          // Written by: Donghee Park (DRONEMAP)
           OtaPackChannelData_RCDATA_AIO(rcdata_plaintext, ChannelData,
                                         TelemetryReceiver.GetCurrentConfirm(),
                                         ExpressLRS_currTlmDenom, otaPkt.full.rc_encrypted.isHighAux);
+          // 1 channel is used for armming channel, pack into 2 bits
           otaPkt.full.rc_encrypted.ch4 = CRSF_to_BIT(ChannelData[4]);
 
+          // Encrypt the RC data if security is enabled
+          // crypto is interface to the crypto library, which can be either LEA-GCM or ASCON
+          // rcdata_plaintext is the plaintext RC data to be encrypted
+          // rcdata_ciphertext is the buffer to hold the encrypted RC data
+          // rcdata_ciphertext_len is the length of the encrypted RC data, if encryption fails, it will be -1
+          //
+          // Written by: Donghee Park (DRONEMAP)
           rcdata_ciphertext_len = crypto->encrypt(rcdata_plaintext, sizeof(rcdata_plaintext), rcdata_ciphertext);
           if (rcdata_ciphertext_len == -1)
           {
@@ -882,6 +895,7 @@ static void CheckConfigChangePending()
 
 bool ICACHE_RAM_ATTR RXdoneISR(SX12xxDriverCommon::rx_status const status)
 {
+// Handle ECDH handshake reception during key exchange phase - Written by: Donghee Park (DRONEMAP)
 #if defined(USE_CRYPTO) && defined(USE_CRYPTO_KEY_EXCHANGE)
   if (!TxHandshake.IsDone()) {
     TxHandshake.RXdoneCallback(status);
@@ -901,6 +915,7 @@ bool ICACHE_RAM_ATTR RXdoneISR(SX12xxDriverCommon::rx_status const status)
 
 void ICACHE_RAM_ATTR TXdoneISR()
 {
+// Handle ECDH handshake transmission completion during key exchange phase - Written by: Donghee Park (DRONEMAP)
 #if defined(USE_CRYPTO) && defined(USE_CRYPTO_KEY_EXCHANGE)
   if (!TxHandshake.IsDone()) {
     TxHandshake.TXdoneCallback();
@@ -1345,6 +1360,9 @@ static void cyclePower()
   }
 }
 
+// Reconfigures cryptographic engine based on security settings and initializes with ECDH keys or change
+// crypto algorithm from from RC Controller LUA UI
+// Written by: Donghee Park (DRONEMAP)
 void reconfigureCrypto()
 {
 #if defined(USE_CRYPTO)
@@ -1362,6 +1380,7 @@ void reconfigureCrypto()
     DebugSerial.print("\r\nUsing ASCON crypto\r\n");
   }
 
+  // Initialize crypto with ECDH-derived keys from handshake - Written by: Donghee Park (DRONEMAP)
   #if defined(USE_CRYPTO_KEY_EXCHANGE)
     uint8_t K[16] = {0}; uint8_t A[16] = {0}; uint8_t N[16] = {0};
     size_t K_len = 0; size_t A_len = 0; size_t N_len = 0;
@@ -1378,6 +1397,7 @@ void reconfigureCrypto()
 
 void setup()
 {
+// Perform ECDH key exchange handshake before normal operation - Written by: Donghee Park (DRONEMAP)
 #if defined(USE_CRYPTO) && defined(USE_CRYPTO_KEY_EXCHANGE)
   setupSerial();
   DebugSerial.println("\r\nWaiting for crypto key exchange handshake...");

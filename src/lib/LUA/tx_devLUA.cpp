@@ -578,7 +578,9 @@ static void registerLuaParameters()
   registerLUAParameter(&luaSecurity, [](struct luaPropertiesCommon *item, uint8_t arg) {
     config.SetSecurity(arg);
     if (config.IsModified()) {
-        // Reconfigure serial to apply the new security settings
+        // Reconfigure serial to apply the new security settings from LUA UI
+        // This is needed to reconfigure and initialize the crypto settings, and counter
+        // Written by Donghee Park (DRONEMAP)
         reconfigureCrypto();
     }
   });

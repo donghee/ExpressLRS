@@ -714,6 +714,7 @@ void RxConfig::Load()
     m_eeprom->Get(0, m_config);
     //m_config.rateInitialIdx = 5; // 333hz
     m_config.rateInitialIdx = 8; // 100hz
+    m_config.serialProtocol = PROTOCOL_CRSF;
     uint32_t version = 0;
     if ((m_config.version & CONFIG_MAGIC_MASK) == RX_CONFIG_MAGIC)
         version = m_config.version & ~CONFIG_MAGIC_MASK;

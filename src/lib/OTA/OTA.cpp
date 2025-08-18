@@ -294,6 +294,20 @@ void PackUInt11ToChannels4x2(const crsf_channels_t* src, uint8_t* destChannels4x
     }
 }
 
+/**
+ * @brief Pack RC channel data into 6-byte format with 4x10-bit low channels and 4x2-bit high channels
+ * This function takes an array of channel data and packs it into a 6-byte RC data format
+ * where the first 5 bytes contain 4x10-bit low channels (CH1-CH4) and the last byte contains
+ * 4x2-bit high channels (CH6-CH9).
+ * @param[out] rcdata Pointer to the output buffer where packed RC data will be stored
+ * @param[in] channelData Pointer to the input array containing 8-channel data in 11-bit format
+ * @param[in] telemetryStatus Telemetry status flag indicating if telemetry is active
+ * @param[in] tlmDenom Telemetry denominator (unused in AIO mode)
+ * @param[in] isHighAux Flag indicating if the high channels are in high auxiliary mode
+ * CH5 is armming channel, packed into 2 bits to OTA RCDATA.ch4
+ *
+ * Written by: Donghee Park (DRONEMAP)
+ */
 void OtaPackChannelData_RCDATA_AIO(uint8_t * rcdata, const uint32_t *channelData, bool telemetryStatus, uint8_t tlmDenom, uint8_t isHighAux)
 {
   OTA_Channels_4x10 tempChannels;
@@ -358,6 +372,10 @@ void UnpackChannels4x2ToUInt11(uint8_t const srcChannels4x2, uint32_t * dest, ui
   }
 }
 
+// Print the channel data in a human-readable format for debugging purposes.
+// This function is used to print the channel data for AIO RC Hardware
+//
+// Written by: Donghee Park (DRONEMAP)
 void printChannelData_AIO(uint32_t *ChannelData) {
   static uint32_t channelData[CRSF_NUM_CHANNELS] = {0};
   crsf_channels_t crsf_channelData_ch5_ch12;
@@ -612,6 +630,24 @@ void UnpackChannels4x2ToUInt11(uint8_t const srcChannels4x2, uint32_t * dest, ui
   }
 }
 
+/**
+ * @brief Unpack encrypted RC data(8-channel 6 byte) from OTA packet into 8-channel data (10 bytes)
+ *
+ * This function extracts and decodes RC channel data from Encyrpted RCDATA
+ * OTA packets, handling both analog and auxiliary channels with efficient bit packing.
+ *
+ * AIO Data Format:
+ * - Low channels (CH1-CH4): 4x10-bit analog data
+ * - High channels (CH5-CH12): 4x2-bit auxiliary data packed in last byte
+ * - Total payload: 6 bytes (5 bytes for low channels + 1 byte for high channels)
+ *
+ * @param[in] otaPktPtr Pointer to OTA packet structure containing encrypted RC data
+ * @param[out] channelData Output array for unpacked channel values (32-bit CRSF format)
+ * @param[in] tlmDenom Telemetry denominator (unused in AIO mode)
+ * @return Telemetry status flag from the packet
+ *
+ * Written by: Donghee Park (DRONEMAP)
+ */
 bool ICACHE_RAM_ATTR OtaUnpackChannelData_RCDATA_AIO(OTA_Packet_s const * const otaPktPtr, uint32_t *channelData, uint8_t const tlmDenom)
 {
     (void)tlmDenom;

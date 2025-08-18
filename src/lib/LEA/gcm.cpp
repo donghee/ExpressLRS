@@ -38,7 +38,7 @@ void GCM::increase_nonce_counter_up_to_32bits_increment(uint8_t *nonce, uint32_t
     }
 }
 
-int GCM::init(const uint8_t* K_, uint32_t K_len_, const uint8_t* A_, uint32_t A_len_, uint8_t *N_, size_t N_len_)
+int GCM::init(const uint8_t* K_, uint32_t K_len_, const uint8_t* A_, uint32_t A_len_, const uint8_t *N_, size_t N_len_)
 {
     int result;
 

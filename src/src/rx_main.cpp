@@ -236,6 +236,7 @@ volatile uint32_t long crypto_processTicks = 0;
 volatile unsigned int crypto_samples = 0;
 
 ECDH rxEcdh;
+// ECDH key exchange handshake manager for secure communication - Written by: Donghee Park (DRONEMAP)
 #if defined(USE_CRYPTO_KEY_EXCHANGE)
 RxHandshakeClass RxHandshake;
 #endif
@@ -909,6 +910,14 @@ static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPkt
         {
             memcpy(&otaPkt, otaPktPtr, sizeof(OTA_Packet_s));
             memcpy(rcdata_ciphertext, otaPktPtr->full.rc_encrypted.raw, sizeof(otaPktPtr->full.rc_encrypted.raw));
+
+            // Decrypt the RC data if security is enabled
+            // crypto is interface to the crypto library, which can be either LEA-GCM or ASCON
+            // rcdata_ciphertext is the encrypted RC data received from the packet
+            // rcdata_plaintext is the buffer to hold the decrypted RC data
+            // rcdata_plaintext_len is the length of the decrypted RC data, if decryption fails, it will be -1
+            //
+            // Written by: Donghee Park (DRONEMAP)
             rcdata_plaintext_len = crypto->decrypt(rcdata_ciphertext, sizeof(rcdata_ciphertext), rcdata_plaintext);
             if (rcdata_plaintext_len == -1)
             {
@@ -925,6 +934,11 @@ static void ICACHE_RAM_ATTR ProcessRfPacket_RC(OTA_Packet_s const * const otaPkt
             // }
             // DebugSerial.println();
 
+            // Unpack the decrypted RC data(6bytes) into 8-CH ChannelData
+            // ChannelData is a global variable that holds the RC channel data
+            // The function OtaUnpackChannelData_RCDATA_AIO will unpack the RC data in OTA Packet
+            //
+            // Written by: Donghee Park (DRONEMAP)
             telemetryConfirmValue = OtaUnpackChannelData_RCDATA_AIO(&otaPkt, ChannelData, ExpressLRS_currTlmDenom);
             if (config.GetSecurity() == 1)
             {
@@ -1203,6 +1217,7 @@ bool ICACHE_RAM_ATTR RXdoneISR(SX12xxDriverCommon::rx_status const status)
 
 void ICACHE_RAM_ATTR TXdoneISR()
 {
+// Handle ECDH handshake transmission completion during key exchange phase - Written by: Donghee Park (DRONEMAP)
 #if defined(USE_CRYPTO) && defined(USE_CRYPTO_KEY_EXCHANGE)
     if (!RxHandshake.IsDone())
     {
@@ -1480,6 +1495,9 @@ void reconfigureSerial()
     setupSerial();
 }
 
+// Reconfigures cryptographic engine based on security settings and initializes with ECDH keys or change
+// crypto algorithm from from RC Controller LUA UI
+// Written by: Donghee Park (DRONEMAP)
 void reconfigureCrypto()
 {
 #if defined(USE_CRYPTO)
@@ -1497,6 +1515,7 @@ void reconfigureCrypto()
     DebugSerial.print("\r\nUsing ASCON crypto\r\n");
   }
 
+  // Initialize crypto with ECDH-derived keys from handshake - Written by: Donghee Park (DRONEMAP)
   #if defined(USE_CRYPTO_KEY_EXCHANGE)
     uint8_t K[16] = {0}; uint8_t A[16] = {0}; uint8_t N[16] = {0};
     size_t K_len = 0; size_t A_len = 0; size_t N_len = 0;
@@ -1859,6 +1878,7 @@ void resetConfigAndReboot()
 
 void setup()
 {
+// Perform ECDH key exchange handshake before normal operation - Written by: Donghee Park (DRONEMAP)
 #if defined(USE_CRYPTO) && defined(USE_CRYPTO_KEY_EXCHANGE)
   setupSerial();
   DebugSerial.println("\r\nWaiting for crypto key exchange handshake...");

@@ -6,9 +6,7 @@ extern HardwareSerial DebugSerial;
 
 #define MAX_P_C_BYTE_LENGTH 256
 
-Ascon128::Ascon128() {
-    ASCON128x_reset(&ascon_TX);
-    ASCON128x_reset(&ascon_RX);
+Ascon128::Ascon128() { ASCON128x_reset(&ascon_TX); ASCON128x_reset(&ascon_RX);
 }
 
 void Ascon128::increment_nonce_counter(uint8_t *nonce)
@@ -43,7 +41,7 @@ void Ascon128::increase_nonce_counter_up_to_32bits_increment(uint8_t *nonce, uin
 
 int Ascon128::init(const uint8_t* K_, uint32_t K_len_,
                    const uint8_t* A_, uint32_t A_len_,
-                   uint8_t *N_, size_t N_len_) {
+                   const uint8_t *N_, size_t N_len_) {
     int result;
 
     memcpy(K, K_, K_len_);

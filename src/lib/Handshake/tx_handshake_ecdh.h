@@ -8,24 +8,66 @@
 #include "common.h"
 #include "uECDH.h"
 
+/** @brief Maximum size for handshake data transmission buffer */
 #define HANDSHAKE_DATA_SIZE 34
 
+/**
+ * @brief Transmitter-side ECDH handshake protocol implementation
+ *
+ * This class implements the transmitter side of the ECDH-based secure handshake
+ * protocol for ExpressLRS radio communication. The handshake establishes a
+ * shared encryption key between transmitter and receiver using elliptic curve
+ * cryptography, ensuring secure communication channels.
+ *
+ * Protocol Flow (TX side):
+ * 1. Wait for initial "hello" message from RX
+ * 2. Send "hello" response to acknowledge RX presence
+ * 3. Send own ECDH public key to RX (in two 32-byte parts)
+ * 4. Wait for and receive RX ECDH public key (sent in two 32-byte parts)
+ * 5. Send "bye" confirmation to complete handshake
+ * 6. Generate shared secret key for encryption
+ *
+ * Features:
+ * - State machine-based handshake protocol
+ * - Timeout handling and automatic retry logic
+ * - 512-bit ECDH key exchange
+ * - Fragmented public key transmission (64 bytes split into 2x32 bytes)
+ * - Redundant bye message transmission for reliability
+ * - Shared secret derivation for LEA/ASCON encryption keys
+ *
+ * Written by: Donghee Park (DRONEMAP)
+ */
 class TxHandshakeClass {
  public:
+  /**
+   * @brief Handshake protocol state enumeration
+   *
+   * Defines the various states of the TX handshake state machine,
+   * from initialization through completion.
+   */
   enum handshake_state_t {
-    INIT = 0,
-    WAIT_HELLO,
-    RECV_HELLO,
-    SEND_HELLO,
-    SEND_ECDH_PUB_KEY,
-    WAIT_ECDH_PUB_KEY,
-    RECV_ECDH_PUB_KEY,
-    SEND_BYE,
-    DONE
+    INIT = 0,              /**< Initial state - prepare for handshake */
+    WAIT_HELLO,            /**< Wait for hello message from RX */
+    RECV_HELLO,            /**< Process received hello from RX */
+    SEND_HELLO,            /**< Send hello response to RX */
+    SEND_ECDH_PUB_KEY,     /**< Send own ECDH public key to RX */
+    WAIT_ECDH_PUB_KEY,     /**< Wait for RX ECDH public key */
+    RECV_ECDH_PUB_KEY,     /**< Process received RX public key */
+    SEND_BYE,              /**< Send bye confirmation to RX */
+    DONE                   /**< Handshake completed successfully */
   };
 
+  /**
+   * @brief Default constructor for TX handshake manager
+   */
   TxHandshakeClass() { }
 
+  /**
+   * @brief Initialize the TX handshake protocol
+   *
+   * Sets up the handshake state machine, initializes ECDH key pair,
+   * and prepares for secure communication establishment.
+   */
   void Init() {
     tx_handshake_state_ = INIT;
     busy_transmitting_ = false;
@@ -35,6 +77,10 @@ class TxHandshakeClass {
     txEcdh.get_public_key(pub_key_, &pub_key_len_);
   }
 
+  /**
+   * @brief Check if handshake protocol has completed successfully
+   * @return true if handshake is complete, false otherwise
+   */
   inline bool IsDone() { return tx_handshake_state_ == DONE; };
 
   void DoHandle() {
@@ -111,8 +157,21 @@ class TxHandshakeClass {
     }
   };
 
+  /**
+   * @brief Callback function called when radio transmission is complete
+   *
+   * Clears the busy transmission flag to allow next transmission.
+   */
   void TXdoneCallback() { Busy(false); };
 
+  /**
+   * @brief Callback function called when radio reception is complete
+   * @param[in] status Reception status from radio driver
+   * @return true if packet was handled by handshake protocol, false otherwise
+   *
+   * Routes received packets to appropriate handlers based on current
+   * handshake state (hello acknowledgment, ECDH key exchange).
+   */
   bool RXdoneCallback(SX12xxDriverCommon::rx_status const status) {
     DBGLN("->RXdoneCallback");
     if (State() == WAIT_HELLO) {
@@ -126,6 +185,12 @@ class TxHandshakeClass {
     }
   };
 
+  /**
+   * @brief Handle reception of hello message from RX
+   *
+   * Validates received "hello" message and transitions to next state.
+   * Continues listening if message is not valid hello.
+   */
   void HandleWaitHello() {
     if (memcmp(Radio.RXdataBuffer, "hello", 5) == 0) {
       DBGLN("got hello");
@@ -136,6 +201,12 @@ class TxHandshakeClass {
     Radio.RXnb();
   };
 
+  /**
+   * @brief Handle reception of ECDH public key from RX
+   *
+   * Processes fragmented ECDH public key reception (2 parts of 32 bytes each).
+   * Reconstructs the complete 64-byte public key from received fragments.
+   */
   void HandleWaitEcdhPubKey() {
     if (Radio.RXdataBuffer[0] == 0xEC) {
       if (Radio.RXdataBuffer[1] == 0) {
@@ -153,6 +224,21 @@ class TxHandshakeClass {
     // Radio.RXnb();
   };
 
+  /**
+   * @brief Generate Crypto encryption keys from ECDH shared secret
+   * @param[out] K Output buffer for LEA encryption key (16 bytes)
+   * @param[out] K_len Length of encryption key (set to 16)
+   * @param[out] A Output buffer for associated data key (16 bytes)
+   * @param[out] A_len Length of associated data (set to 16)
+   * @param[out] N Output buffer for nonce/IV (16 bytes)
+   * @param[out] N_len Length of nonce (set to 16)
+   * @return 0 on success, -1 if handshake not completed
+   *
+   * Derives LEA encryption parameters from the ECDH shared secret:
+   * - K: bytes 0-15 of shared secret (encryption key)
+   * - A: bytes 16-31 of shared secret (associated data)
+   * - N: bytes 8-23 of shared secret (nonce/IV)
+   */
   int LeaKey(uint8_t *K, size_t &K_len, uint8_t *A, size_t &A_len, uint8_t *N,
              size_t &N_len) {
     if (State() != DONE) return -1;

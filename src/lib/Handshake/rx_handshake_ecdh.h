@@ -8,24 +8,65 @@
 #include "common.h"
 #include "uECDH.h"
 
+/** @brief Maximum size for handshake data transmission buffer */
 #define HANDSHAKE_DATA_SIZE 34
 
+/**
+ * @brief Receiver-side ECDH handshake protocol implementation
+ *
+ * This class implements the receiver side of the ECDH-based secure handshake
+ * protocol for ExpressLRS radio communication. The handshake establishes a
+ * shared encryption key between transmitter and receiver using elliptic curve
+ * cryptography, ensuring secure communication channels.
+ *
+ * Protocol Flow (RX side):
+ * 1. Send initial "hello" message to announce presence
+ * 2. Wait for and receive TX "hello" response
+ * 3. Wait for TX ECDH public key (sent in two 32-byte parts)
+ * 4. Send own ECDH public key to TX (in two 32-byte parts)
+ * 5. Wait for "bye" confirmation from TX
+ * 6. Generate shared secret key for encryption
+ *
+ * Features:
+ * - State machine-based handshake protocol
+ * - Timeout handling and automatic retry logic
+ * - 512-bit ECDH key exchange
+ * - Fragmented public key transmission (64 bytes split into 2x32 bytes)
+ * - Shared secret derivation for LEA/ASCON encryption keys
+ *
+ * Written by: Donghee Park (DRONEMAP)
+ */
 class RxHandshakeClass {
  public:
+  /**
+   * @brief Handshake protocol state enumeration
+   *
+   * Defines the various states of the RX handshake state machine,
+   * from initialization through completion.
+   */
   enum handshake_state_t {
-    INIT = 0,
-    SEND_HELLO,
-    WAIT_HELLO,
-    RECV_HELLO,
-    WAIT_ECDH_PUB_KEY,
-    RECV_ECDH_PUB_KEY,
-    SEND_ECDH_PUB_KEY,
-    WAIT_BYE,
-    DONE
+    INIT = 0,              /**< Initial state - prepare for handshake */
+    SEND_HELLO,            /**< Send hello message to TX */
+    WAIT_HELLO,            /**< Wait for hello response from TX */
+    RECV_HELLO,            /**< Process received hello from TX */
+    WAIT_ECDH_PUB_KEY,     /**< Wait for TX ECDH public key */
+    RECV_ECDH_PUB_KEY,     /**< Process received TX public key */
+    SEND_ECDH_PUB_KEY,     /**< Send own ECDH public key to TX */
+    WAIT_BYE,              /**< Wait for bye confirmation from TX */
+    DONE                   /**< Handshake completed successfully */
   };
 
+  /**
+   * @brief Default constructor for RX handshake manager
+   */
   RxHandshakeClass() { }
 
+  /**
+   * @brief Initialize the RX handshake protocol
+   *
+   * Sets up the handshake state machine, initializes ECDH key pair,
+   * and prepares for secure communication establishment.
+   */
   void Init() {
     rx_handshake_state_ = INIT;
     busy_transmitting_ = false;
@@ -35,6 +76,10 @@ class RxHandshakeClass {
     rxEcdh.get_public_key(pub_key_, &pub_key_len_);
   }
 
+  /**
+   * @brief Check if handshake protocol has completed successfully
+   * @return true if handshake is complete, false otherwise
+   */
   inline bool IsDone() { return rx_handshake_state_ == DONE; };
 
   void DoHandle() {
@@ -107,8 +152,21 @@ class RxHandshakeClass {
     }
   };
 
+  /**
+   * @brief Callback function called when radio transmission is complete
+   *
+   * Clears the busy transmission flag to allow next transmission.
+   */
   void TXdoneCallback() { Busy(false); };
 
+  /**
+   * @brief Callback function called when radio reception is complete
+   * @param[in] status Reception status from radio driver
+   * @return true if packet was handled by handshake protocol, false otherwise
+   *
+   * Routes received packets to appropriate handlers based on current
+   * handshake state (hello, ECDH key exchange, bye confirmation).
+   */
   bool RXdoneCallback(SX12xxDriverCommon::rx_status const status) {
     DBGLN("->RXdoneCallback");
     if (State() == WAIT_HELLO) {
@@ -125,6 +183,21 @@ class RxHandshakeClass {
     }
   };
 
+  /**
+   * @brief Generate Cryto encryption keys from ECDH shared secret
+   * @param[out] K Output buffer for LEA encryption key (16 bytes)
+   * @param[out] K_len Length of encryption key (set to 16)
+   * @param[out] A Output buffer for associated data key (16 bytes)
+   * @param[out] A_len Length of associated data (set to 16)
+   * @param[out] N Output buffer for nonce/IV (16 bytes)
+   * @param[out] N_len Length of nonce (set to 16)
+   * @return 0 on success, -1 if handshake not completed
+   *
+   * Derives LEA encryption parameters from the ECDH shared secret:
+   * - K: bytes 0-15 of shared secret (encryption key)
+   * - A: bytes 16-31 of shared secret (associated data)
+   * - N: bytes 8-23 of shared secret (nonce/IV)
+   */
   int LeaKey(uint8_t *K, size_t &K_len, uint8_t *A, size_t &A_len, uint8_t *N,
              size_t &N_len) {
     if (State() != DONE) return -1;

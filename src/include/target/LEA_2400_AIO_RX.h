@@ -1,3 +1,7 @@
+/* LEA AIO RX Pin Definitions
+ * Modified by Donghee Park (DRONEMAP)
+*/
+
 #if !defined(DEVICE_NAME)
     #define DEVICE_NAME             "LEA AIO RX"
 #endif

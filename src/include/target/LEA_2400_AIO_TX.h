@@ -1,3 +1,8 @@
+
+/* LEA AIO TX Pin Definitions
+ * Modified by Donghee Park (DRONEMAP)
+*/
+
 #if !defined(DEVICE_NAME)
     #define DEVICE_NAME             "LEA AIO TX"
 #endif
